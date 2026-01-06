@@ -1,10 +1,13 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 import uvicorn
 import os
+from pathlib import Path
 from aqi_calculator import calculate_aqi, generate_sample_pollutant_data
 
 app = FastAPI(title="AQI Calculator API")
@@ -17,6 +20,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static files for frontend
+static_dir = Path(__file__).parent.parent / "frontend" / "dist"
+if static_dir.exists():
+    app.mount("/assets", StaticFiles(directory=static_dir / "assets"), name="assets")
 
 class AQIRequest(BaseModel):
     location: str
@@ -38,15 +46,15 @@ class AQIResponse(BaseModel):
     dominant_pollutant: str
     message: str
 
-@app.get("/")
+@app.get("/api")
 async def root():
     return {"message": "AQI Calculator API", "status": "running"}
 
-@app.get("/health")
+@app.get("/api/health")
 async def health_check():
     return {"status": "healthy"}
 
-@app.post("/calculate-aqi", response_model=AQIResponse)
+@app.post("/api/calculate-aqi", response_model=AQIResponse)
 async def calculate_aqi_endpoint(request: AQIRequest):
     """
     Calculate AQI based on location and date.
@@ -97,6 +105,18 @@ async def calculate_aqi_endpoint(request: AQIRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error calculating AQI: {str(e)}")
+
+# Serve frontend
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    static_dir = Path(__file__).parent.parent / "frontend" / "dist"
+    if static_dir.exists():
+        file_path = static_dir / full_path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        # For SPA, return index.html for all non-file routes
+        return FileResponse(static_dir / "index.html")
+    return {"message": "Frontend not built"}
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
