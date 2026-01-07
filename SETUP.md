@@ -28,11 +28,12 @@ flowchart LR
 ### Terminal 1: Start Backend (Python)
 
 ```bash
+# From project root
+python -m venv .venv
+.venv\Scripts\activate      # Windows
+# source .venv/bin/activate # Mac/Linux
+pip install -r backend/requirements.txt
 cd backend
-python -m venv venv
-venv\Scripts\activate      # Windows
-# source venv/bin/activate # Mac/Linux
-pip install -r requirements.txt
 python main.py
 ```
 
@@ -125,13 +126,18 @@ taskkill /PID <PID> /F
 
 ```
 # Backend (Terminal 1)
+# From project root:
+python -m venv .venv
+.venv\Scripts\activate      # Windows: .venv\Scripts\activate
+                            # Mac/Linux: source .venv/bin/activate
+pip install -r backend/requirements.txt
 cd backend
-venv\Scripts\activate
 python main.py
 → http://localhost:8000
 
 # Frontend (Terminal 2)  
 cd frontend
+npm install
 npm run dev
 → http://localhost:3000
 ```
