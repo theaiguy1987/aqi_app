@@ -13,7 +13,7 @@ function App() {
     setAqiData(null)
 
     try {
-      const response = await fetch('/api/calculate-aqi', {
+      const response = await fetch('http://localhost:8000/calculate-aqi', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
