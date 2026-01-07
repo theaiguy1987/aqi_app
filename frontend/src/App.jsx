@@ -2,6 +2,9 @@ import { useState } from 'react'
 import AQIForm from './components/AQIForm'
 import AQIResult from './components/AQIResult'
 
+// API URL from environment variable, fallback to localhost for development
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
 function App() {
   const [aqiData, setAqiData] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -13,7 +16,7 @@ function App() {
     setAqiData(null)
 
     try {
-      const response = await fetch('http://localhost:8000/calculate-aqi', {
+      const response = await fetch(`${API_URL}/calculate-aqi`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

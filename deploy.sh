@@ -1,0 +1,95 @@
+#!/bin/bash
+# deploy.sh - Deploy AQI Calculator to Google Cloud Run
+# Run this script from Google Cloud Shell after cloning the repository
+
+set -e
+
+echo "=========================================="
+echo "AQI Calculator - Google Cloud Run Deploy"
+echo "=========================================="
+
+# Configuration
+PROJECT_ID=$(gcloud config get-value project)
+REGION=${REGION:-us-central1}
+BACKEND_SERVICE="aqi-backend"
+FRONTEND_SERVICE="aqi-frontend"
+
+if [ -z "$PROJECT_ID" ]; then
+    echo "Error: No project set. Run: gcloud config set project YOUR_PROJECT_ID"
+    exit 1
+fi
+
+echo ""
+echo "Project ID: $PROJECT_ID"
+echo "Region: $REGION"
+echo ""
+
+# Enable required APIs
+echo "Enabling required APIs..."
+gcloud services enable cloudbuild.googleapis.com
+gcloud services enable run.googleapis.com
+gcloud services enable containerregistry.googleapis.com
+
+# Build and deploy backend
+echo ""
+echo "=========================================="
+echo "Building and deploying backend..."
+echo "=========================================="
+
+cd backend
+gcloud builds submit --tag gcr.io/$PROJECT_ID/$BACKEND_SERVICE
+gcloud run deploy $BACKEND_SERVICE \
+    --image gcr.io/$PROJECT_ID/$BACKEND_SERVICE \
+    --region $REGION \
+    --platform managed \
+    --allow-unauthenticated \
+    --port 8080
+
+# Get backend URL
+BACKEND_URL=$(gcloud run services describe $BACKEND_SERVICE --region=$REGION --format='value(status.url)')
+echo ""
+echo "Backend deployed at: $BACKEND_URL"
+
+cd ..
+
+# Build and deploy frontend
+echo ""
+echo "=========================================="
+echo "Building and deploying frontend..."
+echo "=========================================="
+
+cd frontend
+
+# Build with backend URL
+gcloud builds submit \
+    --tag gcr.io/$PROJECT_ID/$FRONTEND_SERVICE \
+    --substitutions=_VITE_API_URL="$BACKEND_URL"
+
+# Or use docker build directly
+# docker build --build-arg VITE_API_URL=$BACKEND_URL -t gcr.io/$PROJECT_ID/$FRONTEND_SERVICE .
+# docker push gcr.io/$PROJECT_ID/$FRONTEND_SERVICE
+
+gcloud run deploy $FRONTEND_SERVICE \
+    --image gcr.io/$PROJECT_ID/$FRONTEND_SERVICE \
+    --region $REGION \
+    --platform managed \
+    --allow-unauthenticated \
+    --port 8080
+
+# Get frontend URL
+FRONTEND_URL=$(gcloud run services describe $FRONTEND_SERVICE --region=$REGION --format='value(status.url)')
+
+cd ..
+
+echo ""
+echo "=========================================="
+echo "Deployment Complete!"
+echo "=========================================="
+echo ""
+echo "Frontend URL: $FRONTEND_URL"
+echo "Backend URL:  $BACKEND_URL"
+echo "API Docs:     $BACKEND_URL/docs"
+echo ""
+echo "Test the health endpoint:"
+echo "  curl $BACKEND_URL/health"
+echo ""

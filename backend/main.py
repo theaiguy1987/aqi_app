@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 import uvicorn
+import os
 from aqi_calculator import calculate_aqi, generate_sample_pollutant_data
 
 app = FastAPI(title="AQI Calculator API")
@@ -98,4 +99,6 @@ async def calculate_aqi_endpoint(request: AQIRequest):
         raise HTTPException(status_code=500, detail=f"Error calculating AQI: {str(e)}")
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Use PORT environment variable for Cloud Run, default to 8000 for local development
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
