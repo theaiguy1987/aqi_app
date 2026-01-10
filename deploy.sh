@@ -50,6 +50,8 @@ BACKEND_URL=$(gcloud run services describe $BACKEND_SERVICE --region=$REGION --f
 echo ""
 echo "Backend deployed at: $BACKEND_URL"
 
+cd ..
+
 # Build and deploy frontend
 echo ""
 echo "=========================================="
