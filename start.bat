@@ -4,24 +4,38 @@ echo AQI Calculator - Quick Start
 echo ================================
 echo.
 
-echo Setting up Backend...
-cd backend
-if not exist venv (
+REM Get the directory where the script is located
+set "PROJECT_ROOT=%~dp0"
+cd /d "%PROJECT_ROOT%"
+
+echo Setting up environment files...
+REM Create backend .env if it doesn't exist
+if not exist backend\.env (
+    echo Creating backend\.env from example...
+    copy backend\.env.example backend\.env
+)
+
+REM Create frontend .env if it doesn't exist
+if not exist frontend\.env (
+    echo Creating frontend\.env from example...
+    copy frontend\.env.example frontend\.env
+)
+
+echo Setting up Python virtual environment...
+if not exist .venv (
     echo Creating virtual environment...
-    python -m venv venv
+    python -m venv .venv
 )
 
 echo Activating virtual environment...
-call venv\Scripts\activate
+call .venv\Scripts\activate
 
 echo Installing backend dependencies...
-pip install -r requirements.txt
+pip install -r backend\requirements.txt
 
 echo.
 echo Starting backend server...
-start cmd /k "cd /d %CD% && venv\Scripts\activate && python main.py"
-
-cd ..
+start cmd /k "cd /d %PROJECT_ROOT%backend && %PROJECT_ROOT%.venv\Scripts\activate && python main.py"
 
 echo.
 echo Setting up Frontend...
@@ -33,9 +47,9 @@ if not exist node_modules (
 
 echo.
 echo Starting frontend server...
-start cmd /k "cd /d %CD% && npm run dev"
+start cmd /k "cd /d %PROJECT_ROOT%frontend && npm run dev"
 
-cd ..
+cd /d "%PROJECT_ROOT%"
 
 echo.
 echo ================================

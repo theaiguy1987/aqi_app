@@ -1,390 +1,372 @@
-# 🚀 Deployment Guide - Put Your App on the Internet
+# 🚀 Deployment Guide - Google Cloud Run
 
-This guide shows you how to deploy your AQI Calculator so anyone can use it!
-
----
-
-## 📋 Table of Contents
-
-1. [Deployment Overview](#-deployment-overview)
-2. [Option 1: Railway (Easiest)](#-option-1-railway---easiest)
-3. [Option 2: Render (Free Tier)](#-option-2-render---free-tier)
-4. [Option 3: Vercel + Railway](#-option-3-vercel--railway---professional)
-5. [After Deployment](#-after-deployment)
+Put your AQI Calculator on the internet so anyone can use it!
 
 ---
 
-## 🗺️ Deployment Overview
+## 📚 Table of Contents
 
-When you deploy, your app moves from your computer to the cloud:
-
-```mermaid
-flowchart LR
-    subgraph "Now (Local)"
-        A[Your Computer] --> B[localhost:3000]
-        A --> C[localhost:8000]
-    end
-    
-    subgraph "After Deploy (Cloud)"
-        D[Railway/Render] --> E[your-app.up.railway.app]
-        D --> F[your-api.onrender.com]
-    end
-    
-    B -.->|Deploy| E
-    C -.->|Deploy| F
-```
-
-**What gets deployed:**
-
-| Component | Local URL | Cloud URL (example) |
-|-----------|-----------|---------------------|
-| Frontend | localhost:3000 | aqi-frontend.vercel.app |
-| Backend | localhost:8000 | aqi-backend.railway.app |
+1. [What is Google Cloud Run?](#what-is-google-cloud-run)
+2. [Prerequisites](#prerequisites)
+3. [Quick Deploy](#quick-deploy-5-minutes)
+4. [Manual Deploy](#manual-deploy-for-learning)
+5. [How It Works](#how-it-works)
+6. [Making Updates](#making-updates)
+7. [Troubleshooting](#troubleshooting)
+8. [Cost](#cost)
 
 ---
 
-## 🚂 Option 1: Railway - Easiest
+## What is Google Cloud Run?
 
-Railway can deploy both frontend and backend together. Perfect for beginners!
+**Cloud Run** runs your app in containers without you managing servers:
+- ✅ Automatic scaling (0 to 1000s of users)
+- ✅ HTTPS automatically included
+- ✅ Pay only when someone uses it
+- ✅ Global availability
 
-### What is Railway?
-- Cloud platform that runs your code
-- Like a computer in the sky that never turns off
-- Free tier: $5/month credits (enough for small projects)
-
-### Step-by-Step Deployment
-
-```mermaid
-flowchart TD
-    A[Create Railway Account] --> B[Connect GitHub]
-    B --> C[Push code to GitHub]
-    C --> D[Create Backend Service]
-    D --> E[Create Frontend Service]
-    E --> F[Update Frontend URL]
-    F --> G[🎉 Live!]
+```
+Local Development              →    Google Cloud Run
+───────────────────────────────────────────────────────
+localhost:3000 (frontend)      →    https://your-frontend.run.app
+localhost:8000 (backend)       →    https://your-backend.run.app
 ```
 
-### Step 1: Prepare Your Code
+---
 
-First, create these files in your project root:
+## Prerequisites
 
-**Create `Procfile` for backend:**
-```
-web: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
-```
+### 1. Google Cloud Account
+- Create at [cloud.google.com](https://cloud.google.com)
+- New users get **$300 free credit**
 
-**Update `backend/main.py` to use environment port:**
-```python
-import os
+### 2. Google Cloud Project
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Click project dropdown → **New Project**
+3. Name it (e.g., `aqi-calculator`)
+4. Note your **Project ID** (you'll need it!)
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
-```
+### 3. Enable Billing
+- Required even for free tier
+- Go to: **Billing** → **Link a billing account**
+- Don't worry: this app costs ~$0-2/month
 
-### Step 2: Push to GitHub
+---
+
+## Quick Deploy (5 Minutes)
+
+### Step 1: Open Cloud Shell
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com)
+2. Click the terminal icon **>_** in the top right
+3. Wait for the shell to load
+
+### Step 2: Get Your Code
 
 ```bash
-# In your project folder
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/aqi-calculator.git
-git push -u origin main
+# Clone your repository
+git clone https://github.com/theaiguy1987/aqi_app.git
+cd aqi_app
+
+# Switch to deployment branch
+git checkout google-cloud-run
+
+# Set your project ID (replace with yours!)
+gcloud config set project YOUR_PROJECT_ID
 ```
 
-### Step 3: Deploy on Railway
+### Step 3: Deploy!
 
-1. Go to [railway.app](https://railway.app)
-2. Click "Start a New Project"
-3. Select "Deploy from GitHub repo"
-4. Choose your repository
+```bash
+# Make script executable
+chmod +x deploy.sh
 
-```mermaid
-flowchart LR
-    A[railway.app] --> B[New Project]
-    B --> C[GitHub Repo]
-    C --> D[Select aqi-calculator]
-    D --> E[Auto Deploy!]
+# Run deployment
+./deploy.sh
 ```
 
-### Step 4: Configure Backend
-
-1. Click on the deployed service
-2. Go to Settings → Root Directory
-3. Set to: `backend`
-4. Add Start Command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-
-### Step 5: Configure Frontend
-
-1. Create another service in the same project
-2. Root Directory: `frontend`
-3. Build Command: `npm install && npm run build`
-4. Start Command: `npm run preview -- --host --port $PORT`
-
-### Step 6: Update Frontend API URL
-
-Before deploying frontend, update the API URL:
-
-**Edit `frontend/src/App.jsx`:**
-```javascript
-// Change this:
-const response = await fetch('http://localhost:8000/calculate-aqi', {
-
-// To this (use your Railway backend URL):
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-const response = await fetch(`${API_URL}/calculate-aqi`, {
+**Wait 5-10 minutes.** When done, you'll see:
+```
+==========================================
+Deployment Complete!
+==========================================
+Frontend: https://aqi-frontend-xxx-uc.a.run.app
+Backend:  https://aqi-backend-xxx-uc.a.run.app
 ```
 
-**Create `frontend/.env.production`:**
-```
-VITE_API_URL=https://your-backend.railway.app
-```
+### Step 4: Test It!
 
-### Step 7: Get Your URLs!
-
-After deployment, Railway gives you URLs like:
-- Backend: `https://aqi-backend-production.up.railway.app`
-- Frontend: `https://aqi-frontend-production.up.railway.app`
+Open the **Frontend URL** in your browser. Your app is live! 🎉
 
 ---
 
-## 🎨 Option 2: Render - Free Tier
+## Manual Deploy (For Learning)
 
-Render offers a generous free tier. Great for learning!
+If you want to understand each step:
 
-### Backend Deployment
+### Step 1: Enable APIs
 
-```mermaid
-flowchart TD
-    A[render.com] --> B[New Web Service]
-    B --> C[Connect GitHub]
-    C --> D[Select Repo]
-    D --> E[Configure]
-    E --> F[Deploy!]
+```bash
+gcloud services enable \
+    cloudbuild.googleapis.com \
+    run.googleapis.com \
+    containerregistry.googleapis.com
 ```
 
-### Step 1: Create `render.yaml`
+### Step 2: Set Variables
 
-Create this file in your project root:
-
-```yaml
-services:
-  # Backend Service
-  - type: web
-    name: aqi-backend
-    env: python
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.0
-
-  # Frontend Service
-  - type: web
-    name: aqi-frontend
-    env: node
-    rootDir: frontend
-    buildCommand: npm install && npm run build
-    startCommand: npm run preview -- --host --port $PORT
+```bash
+export PROJECT_ID=$(gcloud config get-value project)
+export REGION=us-central1
 ```
 
-### Step 2: Deploy on Render
+### Step 3: Deploy Backend
 
-1. Go to [render.com](https://render.com)
-2. Sign up / Log in
-3. Click "New +" → "Blueprint"
-4. Connect your GitHub repo
-5. Render auto-detects `render.yaml`
-6. Click "Apply"
+```bash
+cd backend
 
-### Step 3: Update CORS
+# Build Docker image
+gcloud builds submit --tag gcr.io/$PROJECT_ID/aqi-backend
 
-Once you have your Render URLs, update the backend CORS:
+# Deploy to Cloud Run
+gcloud run deploy aqi-backend \
+    --image gcr.io/$PROJECT_ID/aqi-backend \
+    --region $REGION \
+    --platform managed \
+    --allow-unauthenticated \
+    --port 8080
 
+# Get the URL
+BACKEND_URL=$(gcloud run services describe aqi-backend --region=$REGION --format='value(status.url)')
+echo "Backend: $BACKEND_URL"
+```
+
+### Step 4: Deploy Frontend
+
+```bash
+cd ../frontend
+
+# Create environment file with backend URL
+echo "VITE_API_URL=$BACKEND_URL" > .env.production
+
+# Build Docker image
+gcloud builds submit --tag gcr.io/$PROJECT_ID/aqi-frontend
+
+# Deploy to Cloud Run
+gcloud run deploy aqi-frontend \
+    --image gcr.io/$PROJECT_ID/aqi-frontend \
+    --region $REGION \
+    --platform managed \
+    --allow-unauthenticated \
+    --port 8080
+
+# Get the URL
+FRONTEND_URL=$(gcloud run services describe aqi-frontend --region=$REGION --format='value(status.url)')
+echo "Frontend: $FRONTEND_URL"
+```
+
+---
+
+## How It Works
+
+### Understanding the Deployment
+
+```
+Your Code
+    ↓
+Docker Build (packages your app)
+    ↓
+Container Registry (stores the package)
+    ↓
+Cloud Run (runs the package)
+    ↓
+Public URL (anyone can access)
+```
+
+### Key Concept: Build-Time vs Runtime
+
+**Backend (Python)** - Runtime variables:
 ```python
-# backend/main.py
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://aqi-frontend.onrender.com",  # Add your Render URL
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Read when server RUNS
+port = os.environ.get("PORT", 8000)
 ```
 
----
-
-## ⚡ Option 3: Vercel + Railway - Professional
-
-This is the professional setup: Vercel for frontend, Railway for backend.
-
-```mermaid
-flowchart TB
-    subgraph "Vercel - Frontend Hosting"
-        A[React App] --> B[Global CDN]
-        B --> C[Fast Worldwide]
-    end
-    
-    subgraph "Railway - Backend Hosting"
-        D[FastAPI] --> E[Python Server]
-    end
-    
-    A -->|API Calls| D
-```
-
-### Why This Combo?
-- **Vercel**: Best for React apps, super fast, free tier
-- **Railway**: Great for Python backends, easy to use
-
-### Step 1: Deploy Backend to Railway
-(Follow Railway steps above)
-
-### Step 2: Deploy Frontend to Vercel
-
-1. Go to [vercel.com](https://vercel.com)
-2. Sign up with GitHub
-3. Click "Add New Project"
-4. Import your repo
-5. Configure:
-   - **Root Directory**: `frontend`
-   - **Framework Preset**: Vite
-   - **Build Command**: `npm run build`
-   - **Output Directory**: `dist`
-
-### Step 3: Add Environment Variable
-
-In Vercel project settings:
-- Go to Settings → Environment Variables
-- Add: `VITE_API_URL` = `https://your-railway-backend.railway.app`
-
-### Step 4: Update Frontend Code
-
+**Frontend (React)** - Build-time variables:
 ```javascript
-// frontend/src/App.jsx
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Read when code is BUILT, not when it runs!
+const API_URL = import.meta.env.VITE_API_URL
+```
 
-const handleCalculateAQI = async (formData) => {
-    const response = await fetch(`${API_URL}/calculate-aqi`, {
-        // ...
-    });
-};
+**Important:** The frontend's API URL must be set BEFORE building the Docker image!
+
+That's why `deploy.sh`:
+1. Deploys backend first
+2. Gets backend URL
+3. Creates `.env.production` with that URL
+4. THEN builds frontend
+
+---
+
+## Making Updates
+
+### Your Workflow
+
+```bash
+# 1. Make changes locally
+code .
+
+# 2. Test locally
+.\start.bat
+
+# 3. Commit and push
+git add .
+git commit -m "feat: Your change"
+git push origin google-cloud-run
+
+# 4. Deploy (in Cloud Shell)
+cd ~/aqi_app
+git pull origin google-cloud-run
+./deploy.sh
+```
+
+### What's Safe to Change
+
+| ✅ Safe | ⚠️ Careful | 🚨 Expert Only |
+|---------|------------|----------------|
+| Python logic | requirements.txt | Dockerfile |
+| React components | package.json | nginx.conf |
+| CSS styles | Environment vars | cloudbuild.yaml |
+| New API endpoints | | deploy.sh |
+
+---
+
+## Troubleshooting
+
+### "Permission denied"
+```bash
+chmod +x deploy.sh
+```
+
+### "Project not set"
+```bash
+gcloud config set project YOUR_PROJECT_ID
+```
+
+### "APIs not enabled"
+```bash
+gcloud services enable cloudbuild.googleapis.com run.googleapis.com containerregistry.googleapis.com
+```
+
+### Container won't start
+Check logs:
+```bash
+gcloud run logs tail aqi-backend --region=us-central1
+gcloud run logs tail aqi-frontend --region=us-central1
+```
+
+### Frontend shows blank page
+1. Open browser DevTools (F12)
+2. Check Console tab for errors
+3. Check Network tab - is the API URL correct?
+
+**Common cause:** Frontend was built without `VITE_API_URL` set.
+
+**Fix:** 
+```bash
+# In Cloud Shell
+cd ~/aqi_app
+echo "VITE_API_URL=$BACKEND_URL" > frontend/.env.production
+./deploy.sh
+```
+
+### "Failed to fetch" error
+1. Check backend is running: `curl YOUR_BACKEND_URL/health`
+2. Check CORS settings in `backend/main.py`
+3. Make sure frontend has correct backend URL
+
+---
+
+## Cost
+
+### Free Tier (Monthly)
+
+| Resource | Free Amount |
+|----------|-------------|
+| Requests | 2 million |
+| CPU | 180,000 vCPU-seconds |
+| Memory | 360,000 GiB-seconds |
+
+### For This App
+
+- **Normal usage**: **$0/month**
+- **High usage**: $2-5/month
+- **Scales to zero** when no one uses it
+
+### Check Your Spending
+
+1. Go to **Billing** → **Reports**
+2. Filter by your project
+3. Set up billing alerts if needed
+
+### Delete Everything (Stop All Costs)
+
+```bash
+gcloud run services delete aqi-frontend --region=us-central1
+gcloud run services delete aqi-backend --region=us-central1
 ```
 
 ---
 
-## ✅ After Deployment
+## Useful Commands
 
-### Test Your Live App
+```bash
+# Check which project you're using
+gcloud config get-value project
 
-```mermaid
-flowchart LR
-    A[Open Browser] --> B[Visit Frontend URL]
-    B --> C[Enter Location]
-    C --> D[Click Calculate]
-    D --> E[See Result!]
+# List your Cloud Run services
+gcloud run services list
+
+# Get service URL
+gcloud run services describe aqi-frontend --region=us-central1 --format='value(status.url)'
+
+# View logs (live)
+gcloud run logs tail aqi-frontend --region=us-central1
+
+# View recent logs
+gcloud run logs read aqi-backend --region=us-central1 --limit=50
+
+# Delete a service
+gcloud run services delete SERVICE_NAME --region=us-central1
 ```
-
-### Common Issues & Fixes
-
-#### Issue 1: CORS Error
-```
-Access to fetch blocked by CORS policy
-```
-**Fix:** Add your frontend URL to backend CORS origins
-
-#### Issue 2: API Not Found
-```
-Failed to fetch
-```
-**Fix:** Check if backend is running and URL is correct
-
-#### Issue 3: Build Failed
-```
-npm ERR! missing script: build
-```
-**Fix:** Make sure you're in the `frontend` directory
-
-### Monitor Your App
-
-Railway and Render both have dashboards showing:
-- 📊 Requests per minute
-- 💾 Memory usage
-- 📝 Logs (errors, requests)
 
 ---
 
-## 📦 Quick Reference
+## Deployment Checklist
 
-### Files to Create for Deployment
-
-```
-AQI_Project/
-├── Procfile                    ← For Railway/Heroku
-├── render.yaml                 ← For Render
-├── backend/
-│   └── requirements.txt        ← Already exists
-└── frontend/
-    └── .env.production         ← API URL for production
-```
-
-### Environment Variables
-
-| Variable | Where | Value |
-|----------|-------|-------|
-| `PORT` | Auto-set by platform | Don't set manually |
-| `VITE_API_URL` | Frontend | Your backend URL |
-
-### Update Checklist Before Deploy
-
-- [ ] Backend CORS includes production frontend URL
-- [ ] Frontend uses environment variable for API URL
-- [ ] All dependencies in requirements.txt / package.json
-- [ ] Removed any hardcoded localhost URLs
+- [ ] Google Cloud account created
+- [ ] Project created and ID noted
+- [ ] Billing enabled
+- [ ] Cloud Shell opened
+- [ ] Repository cloned
+- [ ] `google-cloud-run` branch checked out
+- [ ] Project ID set: `gcloud config set project YOUR_ID`
+- [ ] Deploy script run: `./deploy.sh`
+- [ ] Frontend URL works in browser
+- [ ] Calculator works end-to-end
 
 ---
 
-## 🎉 Congratulations!
+## Summary
 
-Your app is now live on the internet!
+**What you achieved:**
+- 🌍 Your app is live on the internet
+- 🔒 HTTPS enabled automatically
+- 📈 Auto-scales from 0 to thousands of users
+- 💰 Free for low usage
 
-```mermaid
-flowchart LR
-    A[👤 Anyone] -->|Visits| B[your-app.railway.app]
-    B --> C[🌍 Works Worldwide!]
+**Your deployment workflow:**
+```
+Edit code → Test locally → Push to GitHub → Deploy to Cloud
 ```
 
-### Share Your App
-
-Send this to friends:
-```
-https://your-frontend-url.railway.app
-```
-
-### Next Steps
-
-- 🔗 Get a custom domain (optional)
-- 📊 Add analytics to track visitors
-- 🔐 Add authentication for users
-- 📱 Make it a mobile app with PWA
-
----
-
-## 💡 Cost Summary
-
-| Platform | Free Tier | Paid |
-|----------|-----------|------|
-| **Railway** | $5/month credits | $0.005/min |
-| **Render** | 750 hours/month | $7/month |
-| **Vercel** | Unlimited for hobby | $20/month |
-
-**Recommendation for learning:** Use Render's free tier - it's generous enough for small projects!
-
----
-
-**Your AQI Calculator is now live! 🚀🌍**
+**Happy deploying! 🚀**

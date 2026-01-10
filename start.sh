@@ -5,26 +5,39 @@ echo "AQI Calculator - Quick Start"
 echo "================================"
 echo ""
 
-echo "Setting up Backend..."
-cd backend
+# Get the directory where the script is located
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$PROJECT_ROOT"
 
-if [ ! -d "venv" ]; then
+echo "Setting up environment files..."
+# Create backend .env if it doesn't exist
+if [ ! -f "backend/.env" ]; then
+    echo "Creating backend/.env from example..."
+    cp backend/.env.example backend/.env
+fi
+
+# Create frontend .env if it doesn't exist
+if [ ! -f "frontend/.env" ]; then
+    echo "Creating frontend/.env from example..."
+    cp frontend/.env.example frontend/.env
+fi
+
+echo "Setting up Python virtual environment..."
+if [ ! -d ".venv" ]; then
     echo "Creating virtual environment..."
-    python3 -m venv venv
+    python3 -m venv .venv
 fi
 
 echo "Activating virtual environment..."
-source venv/bin/activate
+source .venv/bin/activate
 
 echo "Installing backend dependencies..."
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 
 echo ""
 echo "Starting backend server..."
-python main.py &
+(cd backend && python main.py) &
 BACKEND_PID=$!
-
-cd ..
 
 echo ""
 echo "Setting up Frontend..."
@@ -40,7 +53,7 @@ echo "Starting frontend server..."
 npm run dev &
 FRONTEND_PID=$!
 
-cd ..
+cd "$PROJECT_ROOT"
 
 echo ""
 echo "================================"
