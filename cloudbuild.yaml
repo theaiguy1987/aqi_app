@@ -5,6 +5,7 @@ substitutions:
   _REGION: us-central1
   _BACKEND_SERVICE: aqi-backend
   _FRONTEND_SERVICE: aqi-frontend
+  _VITE_API_URL: ""
 
 steps:
   # Build and push backend image
@@ -35,28 +36,17 @@ steps:
     id: 'deploy-backend'
     waitFor: ['push-backend']
 
-  # Get backend URL for frontend build
-  - name: 'gcr.io/cloud-builders/gcloud'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        BACKEND_URL=$(gcloud run services describe ${_BACKEND_SERVICE} --region=${_REGION} --format='value(status.url)')
-        echo "VITE_API_URL=$BACKEND_URL" > /workspace/frontend/.env.production
-        echo "Backend URL: $BACKEND_URL"
-    id: 'get-backend-url'
-    waitFor: ['deploy-backend']
-
   # Build frontend with backend URL
   - name: 'gcr.io/cloud-builders/docker'
-    entrypoint: 'bash'
     args:
-      - '-c'
-      - |
-        BACKEND_URL=$(cat /workspace/frontend/.env.production | grep VITE_API_URL | cut -d'=' -f2)
-        docker build --build-arg VITE_API_URL=$BACKEND_URL -t gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE} ./frontend
+      - 'build'
+      - '--build-arg'
+      - 'VITE_API_URL=${_VITE_API_URL}'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}'
+      - './frontend'
     id: 'build-frontend'
-    waitFor: ['get-backend-url']
+    waitFor: ['deploy-backend']
 
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/${_FRONTEND_SERVICE}']
