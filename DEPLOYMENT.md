@@ -1,118 +1,116 @@
 # 🚀 Deployment Guide - Google Cloud Run
 
-Deploy your AQI Calculator to Google Cloud Run for production use!
+Put your AQI Calculator on the internet so anyone can use it!
 
 ---
 
-## 📋 Table of Contents
+## 📚 Table of Contents
 
-1. [Overview](#-overview)
-2. [Prerequisites](#-prerequisites)
-3. [Quick Deploy](#-quick-deploy-automated)
-4. [Manual Deployment](#-manual-deployment-step-by-step)
-5. [Testing Locally on Cloud VM](#-testing-locally-on-cloud-vm)
-6. [Configuration](#-configuration)
-7. [Troubleshooting](#-troubleshooting)
-8. [Cost Estimates](#-cost-estimates)
+1. [What is Google Cloud Run?](#what-is-google-cloud-run)
+2. [Prerequisites](#prerequisites)
+3. [Quick Deploy](#quick-deploy-5-minutes)
+4. [Manual Deploy](#manual-deploy-for-learning)
+5. [How It Works](#how-it-works)
+6. [Making Updates](#making-updates)
+7. [Troubleshooting](#troubleshooting)
+8. [Cost](#cost)
 
 ---
 
-## 🗺️ Overview
+## What is Google Cloud Run?
 
-Google Cloud Run is a fully managed serverless platform that automatically scales your containers.
+**Cloud Run** runs your app in containers without you managing servers:
+- ✅ Automatic scaling (0 to 1000s of users)
+- ✅ HTTPS automatically included
+- ✅ Pay only when someone uses it
+- ✅ Global availability
 
-```mermaid
-flowchart LR
-    subgraph "Local Development"
-        A[Your Computer] --> B[localhost:3000]
-        A --> C[localhost:8000]
-    end
-    
-    subgraph "Google Cloud Run"
-        D[Frontend Service] --> E[aqi-frontend-xxx.run.app]
-        F[Backend Service] --> G[aqi-backend-xxx.run.app]
-    end
-    
-    B -.->|Deploy| E
-    C -.->|Deploy| G
-    E -->|API Calls| G
+```
+Local Development              →    Google Cloud Run
+───────────────────────────────────────────────────────
+localhost:3000 (frontend)      →    https://your-frontend.run.app
+localhost:8000 (backend)       →    https://your-backend.run.app
 ```
 
-**Architecture after deployment:**
-
-| Component | Local URL | Cloud Run URL (example) |
-|-----------|-----------|-------------------------|
-| Frontend | localhost:3000 | aqi-frontend-abc123.us-central1.run.app |
-| Backend | localhost:8000 | aqi-backend-abc123.us-central1.run.app |
-
 ---
 
-## 📋 Prerequisites
+## Prerequisites
 
 ### 1. Google Cloud Account
-- Create account at [cloud.google.com](https://cloud.google.com)
-- Free tier includes $300 credit for new users
+- Create at [cloud.google.com](https://cloud.google.com)
+- New users get **$300 free credit**
 
 ### 2. Google Cloud Project
-- Create a new project or use existing one
-- Note your **Project ID** (not project name)
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Click project dropdown → **New Project**
+3. Name it (e.g., `aqi-calculator`)
+4. Note your **Project ID** (you'll need it!)
 
 ### 3. Enable Billing
-- Required even for free tier usage
-- Go to: Billing > Link a billing account
+- Required even for free tier
+- Go to: **Billing** → **Link a billing account**
+- Don't worry: this app costs ~$0-2/month
 
 ---
 
-## 🚀 Quick Deploy (Automated)
-
-The fastest way to deploy using Cloud Shell:
+## Quick Deploy (5 Minutes)
 
 ### Step 1: Open Cloud Shell
 
 1. Go to [console.cloud.google.com](https://console.cloud.google.com)
-2. Click the **Cloud Shell** icon (>_) in the top right
-3. Wait for the shell to initialize
+2. Click the terminal icon **>_** in the top right
+3. Wait for the shell to load
 
-### Step 2: Clone and Deploy
+### Step 2: Get Your Code
 
 ```bash
 # Clone your repository
-git clone https://github.com/YOUR_USERNAME/aqi-calculator.git
-cd aqi-calculator
+git clone https://github.com/theaiguy1987/aqi_app.git
+cd aqi_app
 
-# Checkout the Cloud Run branch
+# Switch to deployment branch
 git checkout google-cloud-run
 
-# Set your project (replace with your project ID)
+# Set your project ID (replace with yours!)
 gcloud config set project YOUR_PROJECT_ID
+```
 
-# Make deploy script executable and run
+### Step 3: Deploy!
+
+```bash
+# Make script executable
 chmod +x deploy.sh
+
+# Run deployment
 ./deploy.sh
 ```
 
-### Step 3: Access Your App
-
-After deployment, you'll see URLs like:
+**Wait 5-10 minutes.** When done, you'll see:
 ```
-Frontend URL: https://aqi-frontend-abc123-uc.a.run.app
-Backend URL:  https://aqi-backend-abc123-uc.a.run.app
+==========================================
+Deployment Complete!
+==========================================
+Frontend: https://aqi-frontend-xxx-uc.a.run.app
+Backend:  https://aqi-backend-xxx-uc.a.run.app
 ```
 
-Visit the Frontend URL to use your app!
+### Step 4: Test It!
+
+Open the **Frontend URL** in your browser. Your app is live! 🎉
 
 ---
 
-## 📝 Manual Deployment (Step-by-Step)
+## Manual Deploy (For Learning)
 
-For learning or debugging, deploy each component manually:
+If you want to understand each step:
 
-### Step 1: Enable Required APIs
+### Step 1: Enable APIs
 
 ```bash
-gcloud services enable cloudbuild.googleapis.com
-gcloud services enable run.googleapis.com
-gcloud services enable containerregistry.googleapis.com
+gcloud services enable \
+    cloudbuild.googleapis.com \
+    run.googleapis.com \
+    containerregistry.googleapis.com
 ```
 
 ### Step 2: Set Variables
@@ -122,11 +120,12 @@ export PROJECT_ID=$(gcloud config get-value project)
 export REGION=us-central1
 ```
 
-### Step 3: Build and Deploy Backend
+### Step 3: Deploy Backend
 
 ```bash
-# Build the Docker image
 cd backend
+
+# Build Docker image
 gcloud builds submit --tag gcr.io/$PROJECT_ID/aqi-backend
 
 # Deploy to Cloud Run
@@ -137,25 +136,21 @@ gcloud run deploy aqi-backend \
     --allow-unauthenticated \
     --port 8080
 
-# Get the backend URL
-BACKEND_URL=$(gcloud run services describe aqi-backend \
-    --region=$REGION --format='value(status.url)')
-echo "Backend URL: $BACKEND_URL"
+# Get the URL
+BACKEND_URL=$(gcloud run services describe aqi-backend --region=$REGION --format='value(status.url)')
+echo "Backend: $BACKEND_URL"
 ```
 
-### Step 4: Build and Deploy Frontend
+### Step 4: Deploy Frontend
 
 ```bash
 cd ../frontend
 
-# Build with backend URL baked in
-gcloud builds submit \
-    --tag gcr.io/$PROJECT_ID/aqi-frontend \
-    --substitutions=_VITE_API_URL="$BACKEND_URL"
+# Create environment file with backend URL
+echo "VITE_API_URL=$BACKEND_URL" > .env.production
 
-# Or use Docker directly:
-# docker build --build-arg VITE_API_URL=$BACKEND_URL -t gcr.io/$PROJECT_ID/aqi-frontend .
-# docker push gcr.io/$PROJECT_ID/aqi-frontend
+# Build Docker image
+gcloud builds submit --tag gcr.io/$PROJECT_ID/aqi-frontend
 
 # Deploy to Cloud Run
 gcloud run deploy aqi-frontend \
@@ -165,265 +160,213 @@ gcloud run deploy aqi-frontend \
     --allow-unauthenticated \
     --port 8080
 
-# Get the frontend URL
-FRONTEND_URL=$(gcloud run services describe aqi-frontend \
-    --region=$REGION --format='value(status.url)')
-echo "Frontend URL: $FRONTEND_URL"
+# Get the URL
+FRONTEND_URL=$(gcloud run services describe aqi-frontend --region=$REGION --format='value(status.url)')
+echo "Frontend: $FRONTEND_URL"
 ```
 
-### Step 5: Update Backend CORS (Optional)
+---
 
-For production, update CORS in `backend/main.py`:
+## How It Works
 
+### Understanding the Deployment
+
+```
+Your Code
+    ↓
+Docker Build (packages your app)
+    ↓
+Container Registry (stores the package)
+    ↓
+Cloud Run (runs the package)
+    ↓
+Public URL (anyone can access)
+```
+
+### Key Concept: Build-Time vs Runtime
+
+**Backend (Python)** - Runtime variables:
 ```python
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://aqi-frontend-xxx.us-central1.run.app",  # Your frontend URL
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Read when server RUNS
+port = os.environ.get("PORT", 8000)
 ```
 
-Then redeploy the backend.
+**Frontend (React)** - Build-time variables:
+```javascript
+// Read when code is BUILT, not when it runs!
+const API_URL = import.meta.env.VITE_API_URL
+```
+
+**Important:** The frontend's API URL must be set BEFORE building the Docker image!
+
+That's why `deploy.sh`:
+1. Deploys backend first
+2. Gets backend URL
+3. Creates `.env.production` with that URL
+4. THEN builds frontend
 
 ---
 
-## 🖥️ Testing Locally on Cloud VM
+## Making Updates
 
-Before deploying to Cloud Run, test locally in Cloud Shell:
-
-### Test Backend
+### Your Workflow
 
 ```bash
-cd backend
+# 1. Make changes locally
+code .
 
-# Create virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
+# 2. Test locally
+.\start.bat
 
-# Install dependencies
-pip install -r requirements.txt
+# 3. Commit and push
+git add .
+git commit -m "feat: Your change"
+git push origin google-cloud-run
 
-# Run the server
-python main.py
-```
-
-Click **Web Preview** (eye icon) > **Preview on port 8000** to test the API.
-
-### Test Frontend
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Run development server
-npm run dev -- --host
-```
-
-Click **Web Preview** > **Preview on port 3000** to test the frontend.
-
-### Test with Docker (Recommended)
-
-```bash
-# Test backend container
-cd backend
-docker build -t aqi-backend .
-docker run -p 8080:8080 aqi-backend
-
-# Test frontend container (in another terminal)
-cd frontend
-docker build --build-arg VITE_API_URL=http://localhost:8080 -t aqi-frontend .
-docker run -p 3000:8080 aqi-frontend
-```
-
----
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-| Variable | Where | Description |
-|----------|-------|-------------|
-| `PORT` | Cloud Run (auto) | Container port (don't set manually) |
-| `VITE_API_URL` | Frontend build | Backend URL for API calls |
-| `PROJECT_ID` | gcloud config | Your GCP project ID |
-| `REGION` | Deploy command | Cloud Run region (e.g., us-central1) |
-
-### Regions
-
-Available Cloud Run regions:
-- `us-central1` (Iowa) - recommended for US
-- `us-east1` (South Carolina)
-- `europe-west1` (Belgium)
-- `asia-east1` (Taiwan)
-
-See full list: [Cloud Run Locations](https://cloud.google.com/run/docs/locations)
-
-### Scaling Configuration
-
-Cloud Run scales automatically. To customize:
-
-```bash
-gcloud run deploy aqi-backend \
-    --image gcr.io/$PROJECT_ID/aqi-backend \
-    --region $REGION \
-    --min-instances 0 \
-    --max-instances 10 \
-    --memory 256Mi \
-    --cpu 1
-```
-
----
-
-## 🐛 Troubleshooting
-
-### Issue: "Permission denied" on deploy script
-
-```bash
-chmod +x deploy.sh
+# 4. Deploy (in Cloud Shell)
+cd ~/aqi_app
+git pull origin google-cloud-run
 ./deploy.sh
 ```
 
-### Issue: "Project not set"
+### What's Safe to Change
 
+| ✅ Safe | ⚠️ Careful | 🚨 Expert Only |
+|---------|------------|----------------|
+| Python logic | requirements.txt | Dockerfile |
+| React components | package.json | nginx.conf |
+| CSS styles | Environment vars | cloudbuild.yaml |
+| New API endpoints | | deploy.sh |
+
+---
+
+## Troubleshooting
+
+### "Permission denied"
+```bash
+chmod +x deploy.sh
+```
+
+### "Project not set"
 ```bash
 gcloud config set project YOUR_PROJECT_ID
 ```
 
-### Issue: "APIs not enabled"
-
+### "APIs not enabled"
 ```bash
 gcloud services enable cloudbuild.googleapis.com run.googleapis.com containerregistry.googleapis.com
 ```
 
-### Issue: Container fails to start
-
+### Container won't start
 Check logs:
 ```bash
-gcloud run services logs read aqi-backend --region=us-central1
-gcloud run services logs read aqi-frontend --region=us-central1
+gcloud run logs tail aqi-backend --region=us-central1
+gcloud run logs tail aqi-frontend --region=us-central1
 ```
 
-### Issue: CORS errors
+### Frontend shows blank page
+1. Open browser DevTools (F12)
+2. Check Console tab for errors
+3. Check Network tab - is the API URL correct?
 
-1. Check if backend URL is correct in frontend build
-2. Update CORS origins in backend to include your frontend URL
-3. Redeploy backend after CORS changes
+**Common cause:** Frontend was built without `VITE_API_URL` set.
 
-### Issue: "Failed to fetch" in browser
-
-1. Open browser DevTools (F12) > Network tab
-2. Check if API request URL is correct
-3. Verify backend is running: `curl $BACKEND_URL/health`
-
-### View Logs
-
+**Fix:** 
 ```bash
-# Stream logs in real-time
-gcloud run services logs tail aqi-backend --region=us-central1
-
-# View recent logs
-gcloud run services logs read aqi-backend --region=us-central1 --limit=100
+# In Cloud Shell
+cd ~/aqi_app
+echo "VITE_API_URL=$BACKEND_URL" > frontend/.env.production
+./deploy.sh
 ```
+
+### "Failed to fetch" error
+1. Check backend is running: `curl YOUR_BACKEND_URL/health`
+2. Check CORS settings in `backend/main.py`
+3. Make sure frontend has correct backend URL
 
 ---
 
-## 💰 Cost Estimates
+## Cost
 
-Cloud Run has a generous free tier:
+### Free Tier (Monthly)
 
-| Resource | Free Tier (per month) |
-|----------|----------------------|
+| Resource | Free Amount |
+|----------|-------------|
 | Requests | 2 million |
 | CPU | 180,000 vCPU-seconds |
 | Memory | 360,000 GiB-seconds |
-| Networking | 1 GB egress |
 
-**For a small project like this AQI Calculator:**
-- Likely **$0/month** with normal usage
-- Scales to zero when not in use
-- Only pay when requests come in
+### For This App
 
-### Cost Optimization Tips
+- **Normal usage**: **$0/month**
+- **High usage**: $2-5/month
+- **Scales to zero** when no one uses it
 
-1. Set `--min-instances 0` to scale to zero
-2. Use `--memory 256Mi` (minimum needed)
-3. Choose a region close to your users
+### Check Your Spending
 
----
+1. Go to **Billing** → **Reports**
+2. Filter by your project
+3. Set up billing alerts if needed
 
-## 📁 Project Structure for Cloud Run
+### Delete Everything (Stop All Costs)
 
-```
-aqi-calculator/
-├── backend/
-│   ├── Dockerfile          # Backend container config
-│   ├── .dockerignore       # Files to exclude from build
-│   ├── main.py             # FastAPI application
-│   ├── aqi_calculator.py   # AQI calculation logic
-│   └── requirements.txt    # Python dependencies
-├── frontend/
-│   ├── Dockerfile          # Frontend container config
-│   ├── .dockerignore       # Files to exclude from build
-│   ├── nginx.conf          # Nginx server config
-│   ├── docker-entrypoint.sh # Container startup script
-│   ├── package.json        # Node dependencies
-│   └── src/                # React source code
-├── cloudbuild.yaml         # Cloud Build automation
-├── deploy.sh               # Quick deploy script
-├── deploy-manual.sh        # Step-by-step deploy guide
-└── DEPLOYMENT.md           # This file
+```bash
+gcloud run services delete aqi-frontend --region=us-central1
+gcloud run services delete aqi-backend --region=us-central1
 ```
 
 ---
 
-## ✅ Deployment Checklist
+## Useful Commands
 
-- [ ] Google Cloud project created
-- [ ] Billing enabled (free tier is fine)
-- [ ] Repository cloned in Cloud Shell
-- [ ] On `google-cloud-run` branch
-- [ ] Project ID configured: `gcloud config set project YOUR_ID`
+```bash
+# Check which project you're using
+gcloud config get-value project
+
+# List your Cloud Run services
+gcloud run services list
+
+# Get service URL
+gcloud run services describe aqi-frontend --region=us-central1 --format='value(status.url)'
+
+# View logs (live)
+gcloud run logs tail aqi-frontend --region=us-central1
+
+# View recent logs
+gcloud run logs read aqi-backend --region=us-central1 --limit=50
+
+# Delete a service
+gcloud run services delete SERVICE_NAME --region=us-central1
+```
+
+---
+
+## Deployment Checklist
+
+- [ ] Google Cloud account created
+- [ ] Project created and ID noted
+- [ ] Billing enabled
+- [ ] Cloud Shell opened
+- [ ] Repository cloned
+- [ ] `google-cloud-run` branch checked out
+- [ ] Project ID set: `gcloud config set project YOUR_ID`
 - [ ] Deploy script run: `./deploy.sh`
 - [ ] Frontend URL works in browser
-- [ ] API health check passes: `curl $BACKEND_URL/health`
+- [ ] Calculator works end-to-end
 
 ---
 
-## 🎉 Success!
+## Summary
 
-Your AQI Calculator is now live on Google Cloud Run!
+**What you achieved:**
+- 🌍 Your app is live on the internet
+- 🔒 HTTPS enabled automatically
+- 📈 Auto-scales from 0 to thousands of users
+- 💰 Free for low usage
 
-```mermaid
-flowchart LR
-    A[👤 Anyone] -->|Visits| B[your-frontend.run.app]
-    B -->|API Call| C[your-backend.run.app]
-    C -->|Response| B
-    B --> D[🌍 Works Worldwide!]
+**Your deployment workflow:**
+```
+Edit code → Test locally → Push to GitHub → Deploy to Cloud
 ```
 
-### Next Steps
-
-- 🔗 Set up a custom domain
-- 📊 Add Cloud Monitoring for metrics
-- 🔐 Add authentication with Firebase Auth
-- 🔄 Set up CI/CD with Cloud Build triggers
-
----
-
-## 📚 Resources
-
-- [Cloud Run Documentation](https://cloud.google.com/run/docs)
-- [Cloud Build Documentation](https://cloud.google.com/build/docs)
-- [Pricing Calculator](https://cloud.google.com/products/calculator)
-- [FastAPI on Cloud Run](https://cloud.google.com/run/docs/quickstarts/build-and-deploy/deploy-python-service)
-
----
-
-**Happy deploying! 🚀☁️**
+**Happy deploying! 🚀**
