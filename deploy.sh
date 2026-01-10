@@ -61,11 +61,9 @@ echo "=========================================="
 # Create .env.production for frontend build
 echo "VITE_API_URL=$BACKEND_URL" > frontend/.env.production
 
-# Build frontend image with backend URL
+# Build frontend image (Dockerfile will copy .env.production and use it during npm run build)
 cd frontend
-gcloud builds submit \
-    --tag gcr.io/$PROJECT_ID/$FRONTEND_SERVICE \
-    --build-arg VITE_API_URL="$BACKEND_URL"
+gcloud builds submit --tag gcr.io/$PROJECT_ID/$FRONTEND_SERVICE
 
 # Deploy frontend to Cloud Run
 gcloud run deploy $FRONTEND_SERVICE \
