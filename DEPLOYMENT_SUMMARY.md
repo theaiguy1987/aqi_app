@@ -39,6 +39,13 @@ graph TD
         P --> Q["Fix: Grant public 'run.invoker' role to frontend service"];
         Q --> R[Application Works!];
         N -- No --> R;
+        R --> S{Update GitHub Repository};
+        S --> T{Git Push Fails: Authentication Error?};
+        T -- Yes --> U[Generate and Add SSH Key to GitHub];
+        U --> V[Change Git Remote URL to SSH];
+        V --> W[Resolve Host Key Verification];
+        W --> X[Successfully Pushed to GitHub!];
+        T -- No --> X;
     end
 ```
 
@@ -70,7 +77,19 @@ We decided to abandon the `deploy.sh` script and use the intended method for dep
 We had a successfully deployed application, but when we tried to access the frontend URL, we were greeted with a "403 Forbidden" error.
 
 *   **What happened?** This error means that even though we could reach the server, it was refusing to show us the page. We investigated the frontend's configuration and logs and discovered that even though we had told the service to allow public access, it wasn't being applied correctly.
-*   **The Fix:** We explicitly updated the IAM (Identity and Access Management) policy for the frontend service to allow all users to access it. This is like telling the bouncer at a club that everyone is on the guest list.
+*   **The Fix:** We explicitly updated the IAM (Identity and Access Management) policy for the frontend service to allow all users to access it. This is like telling the bouncer at a club to ensure everyone is on the guest list.
+
+### 5. Pushing to GitHub: The Authentication Challenge
+
+After all the deployment steps, we needed to update the project repository on GitHub with the changes we made to the configuration files and the new `DEPLOYMENT_SUMMARY.md` file itself. This is a common final step to keep your code version-controlled.
+
+*   **What happened?** We initially tried to push the changes to GitHub using the previous authentication method (username and password), which GitHub no longer supports for security reasons. This resulted in a "Password authentication is not supported" error.
+*   **The Fix: Setting up SSH Keys:** To resolve this, we switched to a more secure and modern authentication method using SSH keys:
+    1.  **Generated an SSH key pair:** We created a pair of cryptographic keys (a public key and a private key) on your local machine using the `ssh-keygen` command.
+    2.  **Added the private key to the `ssh-agent`:** This is a program that manages your SSH keys securely, so you don't have to re-enter passphrases constantly.
+    3.  **Added the public key to your GitHub account:** We instructed you to copy the public key (which is safe to share) and add it to your GitHub account settings. This tells GitHub that anyone presenting the corresponding private key is authorized to access your repositories.
+    4.  **Updated the Git remote URL:** We changed the repository's remote URL from using HTTPS (which requires username/password or PAT) to SSH (which uses the SSH keys we just set up).
+    5.  **Resolved Host Key Verification:** During the first SSH push attempt, we encountered a "Host key verification failed" error. This is a security measure where your computer asks you to confirm that the server you're connecting to (GitHub, in this case) is who it claims to be. We automatically added GitHub's host key to your `known_hosts` file to bypass this prompt for future connections.
 
 ## The Result: A Live Application!
 
