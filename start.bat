@@ -8,6 +8,19 @@ REM Get the directory where the script is located
 set "PROJECT_ROOT=%~dp0"
 cd /d "%PROJECT_ROOT%"
 
+echo Setting up environment files...
+REM Create backend .env if it doesn't exist
+if not exist backend\.env (
+    echo Creating backend\.env from example...
+    copy backend\.env.example backend\.env
+)
+
+REM Create frontend .env if it doesn't exist
+if not exist frontend\.env (
+    echo Creating frontend\.env from example...
+    copy frontend\.env.example frontend\.env
+)
+
 echo Setting up Python virtual environment...
 if not exist .venv (
     echo Creating virtual environment...

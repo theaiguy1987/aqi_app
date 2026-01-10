@@ -9,6 +9,19 @@ echo ""
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_ROOT"
 
+echo "Setting up environment files..."
+# Create backend .env if it doesn't exist
+if [ ! -f "backend/.env" ]; then
+    echo "Creating backend/.env from example..."
+    cp backend/.env.example backend/.env
+fi
+
+# Create frontend .env if it doesn't exist
+if [ ! -f "frontend/.env" ]; then
+    echo "Creating frontend/.env from example..."
+    cp frontend/.env.example frontend/.env
+fi
+
 echo "Setting up Python virtual environment..."
 if [ ! -d ".venv" ]; then
     echo "Creating virtual environment..."
