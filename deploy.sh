@@ -50,25 +50,22 @@ BACKEND_URL=$(gcloud run services describe $BACKEND_SERVICE --region=$REGION --f
 echo ""
 echo "Backend deployed at: $BACKEND_URL"
 
-cd ..
-
 # Build and deploy frontend
 echo ""
 echo "=========================================="
 echo "Building and deploying frontend..."
 echo "=========================================="
 
-cd frontend
+# Create .env.production for frontend build
+echo "VITE_API_URL=$BACKEND_URL" > frontend/.env.production
 
-# Build with backend URL
+# Build frontend image with backend URL
+cd frontend
 gcloud builds submit \
     --tag gcr.io/$PROJECT_ID/$FRONTEND_SERVICE \
-    --substitutions=_VITE_API_URL="$BACKEND_URL"
+    --build-arg VITE_API_URL="$BACKEND_URL"
 
-# Or use docker build directly
-# docker build --build-arg VITE_API_URL=$BACKEND_URL -t gcr.io/$PROJECT_ID/$FRONTEND_SERVICE .
-# docker push gcr.io/$PROJECT_ID/$FRONTEND_SERVICE
-
+# Deploy frontend to Cloud Run
 gcloud run deploy $FRONTEND_SERVICE \
     --image gcr.io/$PROJECT_ID/$FRONTEND_SERVICE \
     --region $REGION \
