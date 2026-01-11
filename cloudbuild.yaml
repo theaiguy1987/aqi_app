@@ -6,7 +6,6 @@ substitutions:
   _BACKEND_SERVICE: aqi-backend
   _FRONTEND_SERVICE: aqi-frontend
   _VITE_API_URL: ""
-  _VITE_API_URL: ""
 
 
 steps:
