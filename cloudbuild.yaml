@@ -5,7 +5,7 @@ substitutions:
   _REGION: us-central1
   _BACKEND_SERVICE: aqi-backend
   _FRONTEND_SERVICE: aqi-frontend
-  _VITE_API_URL: ""
+  _VITE_API_URL: "https://aqi-backend-ezhjyyateq-uc.a.run.app/"
 
 steps:
   # Build and push backend image
