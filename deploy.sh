@@ -38,12 +38,22 @@ echo "=========================================="
 
 cd backend
 gcloud builds submit --tag gcr.io/$PROJECT_ID/$BACKEND_SERVICE
+
+# Check if OPEN_AQ_API is set
+if [ -z "$OPEN_AQ_API" ]; then
+    echo "WARNING: OPEN_AQ_API environment variable not set."
+    echo "Set it with: export OPEN_AQ_API=your_api_key_here"
+    echo "Get a free key at: https://openaq.org"
+    echo ""
+fi
+
 gcloud run deploy $BACKEND_SERVICE \
     --image gcr.io/$PROJECT_ID/$BACKEND_SERVICE \
     --region $REGION \
     --platform managed \
     --allow-unauthenticated \
-    --port 8080
+    --port 8080 \
+    --set-env-vars "OPEN_AQ_API=$OPEN_AQ_API"
 
 # Get backend URL
 BACKEND_URL=$(gcloud run services describe $BACKEND_SERVICE --region=$REGION --format='value(status.url)')

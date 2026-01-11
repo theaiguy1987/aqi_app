@@ -6,6 +6,7 @@ substitutions:
   _BACKEND_SERVICE: aqi-backend
   _FRONTEND_SERVICE: aqi-frontend
   _VITE_API_URL: ""
+  _OPEN_AQ_API: ""  # Set via: --substitutions=_OPEN_AQ_API=your_key
 
 steps:
   # Build and push backend image
@@ -33,6 +34,8 @@ steps:
       - '--allow-unauthenticated'
       - '--port'
       - '8080'
+      - '--set-env-vars'
+      - 'OPEN_AQ_API=${_OPEN_AQ_API}'
     id: 'deploy-backend'
     waitFor: ['push-backend']
 

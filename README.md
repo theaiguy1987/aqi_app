@@ -6,12 +6,17 @@ A beginner-friendly **Air Quality Index Calculator** web application with a Pyth
 
 ## 🎯 What Does This App Do?
 
-1. You enter a city name and date in the web page
-2. The webpage sends this info to a Python server
-3. Python calculates the Air Quality Index
-4. The result comes back with colors (green = good, red = bad)
+1. You select a city from a dropdown (67 Indian cities available)
+2. You pick a monitoring station from that city
+3. The app fetches **real-time air quality data** from OpenAQ
+4. Python calculates the Air Quality Index using EPA standards
+5. The result comes back with colors (green = good, red = bad) and live measurements
 
-**Plus:** A blog section for sharing thoughts on air pollution in India!
+**Features:**
+- 🏙️ 691 monitoring stations across India
+- 📊 Real-time data from OpenAQ API
+- 📈 Individual pollutant breakdowns (PM2.5, PM10, NO2, etc.)
+- 📝 Blog section for sharing thoughts on air pollution in India!
 
 ---
 
@@ -41,7 +46,10 @@ Frontend (React) ──sends request──► Backend (Python)
 aqi_app/
 ├── backend/              ← Python code (YOU CAN READ THIS!)
 │   ├── main.py           ← API server (like Flask)
-│   └── aqi_calculator.py ← The calculation logic
+│   ├── aqi_calculator.py ← AQI calculation logic (EPA standards)
+│   ├── station_service.py ← Manages 691 Indian monitoring stations
+│   ├── openaq_client.py  ← Fetches live data from OpenAQ API
+│   └── india_stations.json ← Cached station database
 │
 ├── frontend/             ← React code (web interface)
 │   └── src/

@@ -75,13 +75,25 @@ git checkout google-cloud-run
 gcloud config set project YOUR_PROJECT_ID
 ```
 
-### Step 3: Deploy!
+### Step 3: Set Up OpenAQ API Key
+
+The app fetches live air quality data from OpenAQ. You need a free API key:
+
+1. Go to [openaq.org](https://openaq.org) and create an account
+2. Get your API key from your profile
+3. Set it as an environment variable:
+
+```bash
+export OPEN_AQ_API=your_api_key_here
+```
+
+### Step 4: Deploy!
 
 ```bash
 # Make script executable
 chmod +x deploy.sh
 
-# Run deployment
+# Run deployment (uses OPEN_AQ_API from environment)
 ./deploy.sh
 ```
 
@@ -128,18 +140,21 @@ cd backend
 # Build Docker image
 gcloud builds submit --tag gcr.io/$PROJECT_ID/aqi-backend
 
-# Deploy to Cloud Run
+# Deploy to Cloud Run (with OpenAQ API key)
 gcloud run deploy aqi-backend \
     --image gcr.io/$PROJECT_ID/aqi-backend \
     --region $REGION \
     --platform managed \
     --allow-unauthenticated \
-    --port 8080
+    --port 8080 \
+    --set-env-vars "OPEN_AQ_API=your_openaq_api_key_here"
 
 # Get the URL
 BACKEND_URL=$(gcloud run services describe aqi-backend --region=$REGION --format='value(status.url)')
 echo "Backend: $BACKEND_URL"
 ```
+
+**Note:** Get your free OpenAQ API key at [openaq.org](https://openaq.org)
 
 ### Step 4: Deploy Frontend
 
@@ -189,6 +204,7 @@ Public URL (anyone can access)
 ```python
 # Read when server RUNS
 port = os.environ.get("PORT", 8000)
+api_key = os.environ.get("OPEN_AQ_API")  # For OpenAQ live data
 ```
 
 **Frontend (React)** - Build-time variables:
@@ -198,6 +214,20 @@ const API_URL = import.meta.env.VITE_API_URL
 ```
 
 **Important:** The frontend's API URL must be set BEFORE building the Docker image!
+
+### Data Flow in Production
+
+```
+User selects city/station on Frontend
+    ↓
+Frontend calls Backend /aqi/live endpoint
+    ↓
+Backend fetches live data from OpenAQ API
+    ↓
+Backend calculates AQI using EPA standards
+    ↓
+Result displayed with real measurements
+```
 
 That's why `deploy.sh`:
 1. Deploys backend first

@@ -95,10 +95,10 @@ npm run dev
 
 **Full test:**
 1. Open http://localhost:3000
-2. Enter "New York" as location
-3. Select today's date
-4. Click "Calculate AQI"
-5. See a colored result card!
+2. Select "Delhi" from the city dropdown
+3. Select "Anand Vihar" station (or any 🟢 active station)
+4. Click "Get Air Quality Index"
+5. See real-time AQI with live measurements!
 
 ---
 
@@ -150,7 +150,10 @@ The app uses `.env` files for configuration. The start scripts create them autom
 ### Backend (`backend/.env`)
 ```
 PORT=8000
+OPEN_AQ_API=your_openaq_api_key_here
 ```
+
+**Get your OpenAQ API key:** Register at [openaq.org](https://openaq.org) (free)
 
 ### Frontend (`frontend/.env`)
 ```
@@ -177,13 +180,23 @@ Your Computer
 
 The frontend makes API calls to the backend:
 ```
-User clicks "Calculate AQI"
+User selects city
     ↓
-Frontend sends POST to localhost:8000/calculate-aqi
+Frontend calls GET /cities → Shows city dropdown
     ↓
-Backend calculates and returns result
+User selects station
     ↓
-Frontend displays colored result
+Frontend calls GET /stations/{city} → Shows station dropdown
+    ↓
+User clicks "Get Air Quality Index"
+    ↓
+Frontend sends POST /aqi/live {station_id: 235}
+    ↓
+Backend fetches live data from OpenAQ API
+    ↓
+Backend calculates AQI and returns result
+    ↓
+Frontend displays AQI with measurements
 ```
 
 ---

@@ -12,12 +12,12 @@ src/
 ├── main.jsx             ← Entry point
 ├── index.css            ← Styles (Tailwind CSS)
 ├── pages/
-│   ├── Calculator.jsx   ← AQI calculator page
+│   ├── Calculator.jsx   ← AQI calculator page (calls /aqi/live)
 │   └── Blog.jsx         ← Blog page
 └── components/
     ├── Navigation.jsx   ← Top navigation bar
-    ├── AQIForm.jsx      ← Input form
-    └── AQIResult.jsx    ← Colored result display
+    ├── AQIForm.jsx      ← City & station selector dropdowns
+    └── AQIResult.jsx    ← Colored result with live measurements
 ```
 
 ---
@@ -38,8 +38,14 @@ npm run dev
 
 | URL | Page | Description |
 |-----|------|-------------|
-| `/` | Calculator | Enter location/date, get AQI result |
+| `/` | Calculator | Select city → station → get live AQI |
 | `/blog` | Blog | Articles about air pollution in India |
+
+### Calculator Flow
+1. **Select City** - Dropdown shows 67 cities with station counts
+2. **Select Station** - Shows stations in that city (🟢 active, 🔴 inactive)
+3. **Click "Get AQI"** - Fetches real-time data from OpenAQ
+4. **View Results** - AQI value, color, measurements, health advice
 
 ---
 

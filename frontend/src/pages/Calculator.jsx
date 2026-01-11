@@ -16,23 +16,38 @@ export default function Calculator() {
     setAqiData(null)
 
     try {
-      const response = await fetch(`${API_URL}/calculate-aqi`, {
+      // Call the new live AQI endpoint
+      const response = await fetch(`${API_URL}/aqi/live`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          station_id: formData.station_id
+        }),
       })
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.detail || 'Failed to calculate AQI')
+        throw new Error(errorData.detail || 'Failed to fetch AQI data')
       }
 
       const data = await response.json()
-      setAqiData(data)
+      
+      // Transform data to match AQIResult component expectations
+      setAqiData({
+        aqi: data.aqi,
+        category: data.category,
+        color: data.color,
+        location: `${data.station_name}, ${data.locality || formData.city}`,
+        date: data.fetched_at,
+        dominant_pollutant: data.dominant_pollutant,
+        message: data.message,
+        measurements: data.measurements,
+        individual_aqis: data.individual_aqis
+      })
     } catch (err) {
-      setError(err.message || 'An error occurred while calculating AQI')
+      setError(err.message || 'An error occurred while fetching AQI data')
     } finally {
       setLoading(false)
     }
@@ -60,7 +75,7 @@ export default function Calculator() {
               {loading && (
                 <div className="bg-white rounded-lg shadow-lg p-8 text-center">
                   <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-                  <p className="mt-4 text-gray-600">Calculating AQI...</p>
+                  <p className="mt-4 text-gray-600">Fetching live air quality data...</p>
                 </div>
               )}
 
@@ -82,7 +97,7 @@ export default function Calculator() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
                     </svg>
                   </div>
-                  <p className="text-gray-500">Enter a location and date to calculate AQI</p>
+                  <p className="text-gray-500">Select a city and station to check air quality</p>
                 </div>
               )}
             </div>
@@ -91,7 +106,7 @@ export default function Calculator() {
 
         <footer className="mt-16 text-center text-gray-600 text-sm">
           <p>AQI values are calculated based on EPA standards</p>
-          <p className="mt-1">For demonstration purposes, sample pollutant data is generated</p>
+          <p className="mt-1">Data sourced from OpenAQ monitoring stations</p>
         </footer>
       </div>
     </div>
