@@ -31,7 +31,7 @@ steps:
           --platform 'managed' \
           --allow-unauthenticated \
           --port '8080' \
-          --set-env-vars "OPEN_AQ_API=$OPAQ_API_KEY"
+          --set-env-vars "OPEN_AQ_API=$$OPAQ_API_KEY"
     secretEnv: ['OPAQ_API_KEY']
     id: 'deploy-backend'
     waitFor: ['push-backend']
