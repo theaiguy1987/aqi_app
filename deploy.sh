@@ -39,11 +39,11 @@ echo "=========================================="
 cd backend
 gcloud builds submit --tag gcr.io/$PROJECT_ID/$BACKEND_SERVICE
 
-# Check if OPEN_AQ_API is set
-if [ -z "$OPEN_AQ_API" ]; then
-    echo "WARNING: OPEN_AQ_API environment variable not set."
-    echo "Set it with: export OPEN_AQ_API=your_api_key_here"
-    echo "Get a free key at: https://openaq.org"
+# Check if AQICN_API_TOKEN is set
+if [ -z "$AQICN_API_TOKEN" ]; then
+    echo "WARNING: AQICN_API_TOKEN environment variable not set."
+    echo "Set it with: export AQICN_API_TOKEN=your_api_token_here"
+    echo "Get a free token at: https://aqicn.org/data-platform/token/"
     echo ""
 fi
 
@@ -53,7 +53,7 @@ gcloud run deploy $BACKEND_SERVICE \
     --platform managed \
     --allow-unauthenticated \
     --port 8080 \
-    --set-env-vars "OPEN_AQ_API=$OPEN_AQ_API"
+    --set-env-vars "AQICN_API_TOKEN=$AQICN_API_TOKEN"
 
 # Get backend URL
 BACKEND_URL=$(gcloud run services describe $BACKEND_SERVICE --region=$REGION --format='value(status.url)')
@@ -68,8 +68,17 @@ echo "=========================================="
 echo "Building and deploying frontend..."
 echo "=========================================="
 
+# Check if GOOGLE_MAPS_API_KEY is set for location autocomplete
+if [ -z "$GOOGLE_MAPS_API_KEY" ]; then
+    echo "WARNING: GOOGLE_MAPS_API_KEY environment variable not set."
+    echo "Location autocomplete will not work without it."
+    echo "Set it with: export GOOGLE_MAPS_API_KEY=your_api_key_here"
+    echo ""
+fi
+
 # Create .env.production for frontend build
 echo "VITE_API_URL=$BACKEND_URL" > frontend/.env.production
+echo "VITE_GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY" >> frontend/.env.production
 
 # Build frontend image (Dockerfile will copy .env.production and use it during npm run build)
 cd frontend
