@@ -1,192 +1,399 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 // API URL from environment variable, fallback to localhost for development
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
 
 function AQIForm({ onSubmit, loading }) {
-  // State for city and station selection
-  const [cities, setCities] = useState([])
-  const [selectedCity, setSelectedCity] = useState('')
-  const [stations, setStations] = useState([])
-  const [selectedStation, setSelectedStation] = useState(null)
-  
-  // Loading states
-  const [loadingCities, setLoadingCities] = useState(true)
-  const [loadingStations, setLoadingStations] = useState(false)
+  // State for location input
+  const [locationInput, setLocationInput] = useState('')
+  const [selectedLocation, setSelectedLocation] = useState(null)
+  const [predictions, setPredictions] = useState([])
+  const [showPredictions, setShowPredictions] = useState(false)
+  const [isLoadingPredictions, setIsLoadingPredictions] = useState(false)
   const [error, setError] = useState(null)
+  const [useCurrentLocation, setUseCurrentLocation] = useState(false)
+  const [gettingLocation, setGettingLocation] = useState(false)
+  const [placesReady, setPlacesReady] = useState(false)
+  
+  // Refs
+  const inputRef = useRef(null)
+  const wrapperRef = useRef(null)
+  const debounceTimerRef = useRef(null)
 
-  // Fetch cities on component mount
+  // Load Google Maps Places library (New API)
   useEffect(() => {
-    fetchCities()
+    if (!GOOGLE_MAPS_API_KEY) {
+      console.warn('Google Maps API key not configured. Autocomplete will be disabled.')
+      return
+    }
+
+    // Check if script already loaded
+    if (window.google && window.google.maps && window.google.maps.places) {
+      setPlacesReady(true)
+      console.log('Google Maps Places API ready (already loaded)')
+      return
+    }
+
+    // Load script with the new Places API
+    const script = document.createElement('script')
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`
+    script.async = true
+    script.onload = () => {
+      if (window.google && window.google.maps && window.google.maps.places) {
+        setPlacesReady(true)
+        console.log('Google Maps Places API loaded successfully')
+      } else {
+        console.error('Google Maps loaded but Places API not available')
+      }
+    }
+    script.onerror = (error) => {
+      console.error('Failed to load Google Maps API:', error)
+    }
+    document.head.appendChild(script)
+
+    return () => {
+      // Cleanup if needed
+    }
   }, [])
 
-  // Fetch stations when city changes
+  // Close predictions when clicking outside
   useEffect(() => {
-    if (selectedCity) {
-      fetchStations(selectedCity)
-    } else {
-      setStations([])
-      setSelectedStation(null)
+    function handleClickOutside(event) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setShowPredictions(false)
+      }
     }
-  }, [selectedCity])
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
-  const fetchCities = async () => {
-    setLoadingCities(true)
-    setError(null)
+  // Fetch predictions when input changes (using new Places API)
+  useEffect(() => {
+    // Clear any pending debounce
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+
+    if (!locationInput || locationInput.length < 2) {
+      setPredictions([])
+      setIsLoadingPredictions(false)
+      return
+    }
+    
+    if (!placesReady || !window.google?.maps?.places) {
+      console.warn('Places API not ready yet')
+      setIsLoadingPredictions(false)
+      return
+    }
+
+    setIsLoadingPredictions(true)
+
+    // Debounce the API call
+    debounceTimerRef.current = setTimeout(async () => {
+      try {
+        // Use the new AutocompleteSuggestion API
+        const { suggestions } = await window.google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input: locationInput,
+          includedPrimaryTypes: ['locality', 'administrative_area_level_1', 'administrative_area_level_2', 'country'],
+        })
+
+        if (suggestions && suggestions.length > 0) {
+          const formattedPredictions = suggestions.slice(0, 5).map(suggestion => ({
+            placeId: suggestion.placePrediction.placeId,
+            mainText: suggestion.placePrediction.mainText?.text || '',
+            secondaryText: suggestion.placePrediction.secondaryText?.text || '',
+            description: suggestion.placePrediction.text?.text || '',
+          }))
+          setPredictions(formattedPredictions)
+          setShowPredictions(true)
+        } else {
+          setPredictions([])
+        }
+        setIsLoadingPredictions(false)
+      } catch (err) {
+        console.error('Places API error:', err)
+        setPredictions([])
+        setIsLoadingPredictions(false)
+      }
+    }, 300)
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [locationInput, placesReady])
+
+  // Handle prediction selection (using new Places API)
+  const handleSelectPrediction = async (prediction) => {
+    setLocationInput(prediction.description)
+    setShowPredictions(false)
+    setPredictions([])
+
     try {
-      const response = await fetch(`${API_URL}/cities`)
-      if (!response.ok) throw new Error('Failed to fetch cities')
-      const data = await response.json()
-      setCities(data)
+      const place = new window.google.maps.places.Place({
+        id: prediction.placeId,
+      })
+      
+      await place.fetchFields({ fields: ['location', 'displayName'] })
+      
+      if (place.location) {
+        setSelectedLocation({
+          name: prediction.description,
+          latitude: place.location.lat(),
+          longitude: place.location.lng()
+        })
+        setError(null)
+      } else {
+        setError('Could not get coordinates for this location')
+      }
     } catch (err) {
-      setError('Failed to load cities. Please try again.')
-      console.error('Error fetching cities:', err)
-    } finally {
-      setLoadingCities(false)
+      console.error('Error fetching place details:', err)
+      setError('Could not get coordinates for this location')
     }
   }
 
-  const fetchStations = async (city) => {
-    setLoadingStations(true)
-    setSelectedStation(null)
-    setError(null)
-    try {
-      const response = await fetch(`${API_URL}/stations/${encodeURIComponent(city)}`)
-      if (!response.ok) throw new Error('Failed to fetch stations')
-      const data = await response.json()
-      setStations(data)
-    } catch (err) {
-      setError(`Failed to load stations for ${city}. Please try again.`)
-      console.error('Error fetching stations:', err)
-    } finally {
-      setLoadingStations(false)
+  // Handle getting current location
+  const handleGetCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported by your browser')
+      return
     }
+
+    setGettingLocation(true)
+    setError(null)
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords
+        setSelectedLocation({
+          name: 'Current Location',
+          latitude,
+          longitude
+        })
+        setLocationInput(`📍 Current Location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`)
+        setGettingLocation(false)
+        setUseCurrentLocation(true)
+      },
+      (error) => {
+        setGettingLocation(false)
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            setError('Location access denied. Please enable location permissions.')
+            break
+          case error.POSITION_UNAVAILABLE:
+            setError('Location information is unavailable.')
+            break
+          case error.TIMEOUT:
+            setError('Location request timed out.')
+            break
+          default:
+            setError('An error occurred while getting your location.')
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    )
   }
 
   const handleSubmit = (e) => {
     e.preventDefault()
     
-    if (!selectedStation) {
-      alert('Please select a city and station')
+    if (!selectedLocation) {
+      setError('Please select a location from the suggestions or use current location')
       return
     }
 
     onSubmit({
-      station_id: selectedStation.id,
-      station_name: selectedStation.name,
-      city: selectedCity
+      latitude: selectedLocation.latitude,
+      longitude: selectedLocation.longitude,
+      locationName: selectedLocation.name
     })
   }
 
-  const handleCityChange = (e) => {
-    setSelectedCity(e.target.value)
-  }
-
-  const handleStationChange = (e) => {
-    const stationId = parseInt(e.target.value)
-    const station = stations.find(s => s.id === stationId)
-    setSelectedStation(station)
+  const handleInputChange = (e) => {
+    setLocationInput(e.target.value)
+    setSelectedLocation(null)
+    setUseCurrentLocation(false)
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-8">
-      <h2 className="text-2xl font-semibold text-gray-800 mb-6">
-        Check Air Quality
-      </h2>
+    <div className="bg-white rounded-2xl shadow-xl p-7 border border-gray-100">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-gray-800">Check Air Quality</h2>
+          <p className="text-sm text-gray-400">Search any location worldwide</p>
+        </div>
+      </div>
       
       {error && (
-        <div className="mb-4 p-3 bg-red-100 border border-red-300 text-red-700 rounded-lg">
-          {error}
+        <div className="mb-5 p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3">
+          <div className="flex-shrink-0 w-5 h-5 rounded-full bg-red-100 flex items-center justify-center mt-0.5">
+            <span className="text-red-500 text-xs">!</span>
+          </div>
+          <p className="text-red-600 text-sm">{error}</p>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* City Selection */}
-        <div>
-          <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-2">
-            Select City
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Location Input with Autocomplete */}
+        <div ref={wrapperRef} className="relative">
+          <label htmlFor="location" className="block text-sm font-semibold text-gray-700 mb-2">
+            Location
           </label>
-          <select
-            id="city"
-            value={selectedCity}
-            onChange={handleCityChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition bg-white"
-            disabled={loading || loadingCities}
-          >
-            <option value="">
-              {loadingCities ? 'Loading cities...' : '-- Select a city --'}
-            </option>
-            {cities.map((city) => (
-              <option key={city.name} value={city.name}>
-                {city.name} ({city.station_count} stations)
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Station Selection */}
-        <div>
-          <label htmlFor="station" className="block text-sm font-medium text-gray-700 mb-2">
-            Select Monitoring Station
-          </label>
-          <select
-            id="station"
-            value={selectedStation?.id || ''}
-            onChange={handleStationChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition bg-white"
-            disabled={loading || loadingStations || !selectedCity}
-          >
-            <option value="">
-              {!selectedCity 
-                ? '-- Select a city first --' 
-                : loadingStations 
-                  ? 'Loading stations...' 
-                  : '-- Select a station --'}
-            </option>
-            {stations.map((station) => (
-              <option key={station.id} value={station.id}>
-                {station.is_active ? '🟢' : '🔴'} {station.name}
-              </option>
-            ))}
-          </select>
-          {selectedCity && stations.length > 0 && (
-            <p className="mt-1 text-sm text-gray-500">
-              🟢 = Active (recent data), 🔴 = Inactive
+          <div className="relative group">
+            <div className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-500 transition-colors">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <input
+              ref={inputRef}
+              type="text"
+              id="location"
+              value={locationInput}
+              onChange={handleInputChange}
+              onFocus={() => predictions.length > 0 && setShowPredictions(true)}
+              placeholder="Type a city, address, or place..."
+              className="w-full pl-11 pr-10 py-3.5 bg-gray-50 border-2 border-gray-100 rounded-xl focus:ring-0 focus:border-indigo-400 focus:bg-white transition-all placeholder:text-gray-400"
+              disabled={loading || gettingLocation}
+              autoComplete="off"
+            />
+            {isLoadingPredictions && (
+              <div className="absolute right-3.5 top-1/2 transform -translate-y-1/2">
+                <div className="animate-spin h-5 w-5 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
+              </div>
+            )}
+          </div>
+          
+          {/* Predictions dropdown */}
+          {showPredictions && predictions.length > 0 && (
+            <ul className="absolute z-10 w-full bg-white border border-gray-200 rounded-xl mt-2 shadow-xl max-h-64 overflow-auto">
+              {predictions.map((prediction) => (
+                <li
+                  key={prediction.placeId}
+                  onClick={() => handleSelectPrediction(prediction)}
+                  className="px-4 py-3 hover:bg-indigo-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      </svg>
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-gray-900 font-medium truncate">
+                        {prediction.mainText}
+                      </div>
+                      <div className="text-gray-400 text-sm truncate">
+                        {prediction.secondaryText}
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          
+          {/* No Google API key message - only show as subtle hint */}
+          {!GOOGLE_MAPS_API_KEY && locationInput.length >= 2 && (
+            <p className="mt-2 text-xs text-gray-400 flex items-center gap-1.5">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Place search unavailable. Use "Current Location" below.
             </p>
           )}
         </div>
 
-        {/* Station Details */}
-        {selectedStation && (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <h3 className="font-medium text-gray-800 mb-2">Station Details</h3>
-            <div className="text-sm text-gray-600 space-y-1">
-              <p><strong>Name:</strong> {selectedStation.name}</p>
-              <p><strong>Provider:</strong> {selectedStation.provider}</p>
-              <p><strong>Sensors:</strong> {selectedStation.sensors.slice(0, 5).join(', ')}{selectedStation.sensors.length > 5 ? '...' : ''}</p>
-              <p><strong>Status:</strong> {selectedStation.is_active ? '🟢 Active' : '🔴 Inactive'}</p>
-              {selectedStation.last_updated && (
-                <p><strong>Last Update:</strong> {new Date(selectedStation.last_updated).toLocaleString()}</p>
-              )}
+        {/* Divider */}
+        <div className="relative py-2">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-100"></div>
+          </div>
+          <div className="relative flex justify-center">
+            <span className="bg-white px-3 text-xs text-gray-400 uppercase tracking-wide">or</span>
+          </div>
+        </div>
+
+        {/* Current Location Button */}
+        <button
+          type="button"
+          onClick={handleGetCurrentLocation}
+          disabled={loading || gettingLocation}
+          className="w-full flex items-center justify-center gap-2.5 px-4 py-3.5 bg-gray-50 text-gray-700 rounded-xl border-2 border-gray-100 hover:border-indigo-200 hover:bg-indigo-50 transition-all disabled:opacity-50 group"
+        >
+          {gettingLocation ? (
+            <>
+              <div className="animate-spin h-5 w-5 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
+              <span className="font-medium">Getting location...</span>
+            </>
+          ) : (
+            <>
+              <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
+                <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </div>
+              <span className="font-medium">Use My Current Location</span>
+            </>
+          )}
+        </button>
+
+        {/* Selected Location Indicator */}
+        {selectedLocation && (
+          <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+            <div className="flex items-center gap-2 text-emerald-700 mb-1">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="font-semibold text-sm">Location Ready</span>
             </div>
+            <p className="text-sm text-emerald-600 truncate" title={selectedLocation.name}>
+              {selectedLocation.name}
+            </p>
+            <p className="text-xs text-emerald-500 mt-0.5">
+              {selectedLocation.latitude.toFixed(4)}°, {selectedLocation.longitude.toFixed(4)}°
+            </p>
           </div>
         )}
 
-        {/* Info Box */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-800">
-            <strong>💡 Real-time Data:</strong> This app fetches live air quality measurements from OpenAQ monitoring stations across India.
-          </p>
-        </div>
-
+        {/* Submit Button */}
         <button
           type="submit"
-          disabled={loading || !selectedStation}
-          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={loading || !selectedLocation}
+          className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-200 hover:shadow-indigo-300"
         >
-          {loading ? 'Fetching Live Data...' : 'Get Air Quality Index'}
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+              Fetching Air Quality...
+            </span>
+          ) : (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              Get Air Quality Index
+            </span>
+          )}
         </button>
       </form>
+
+      {/* Info text */}
+      <p className="mt-5 text-xs text-gray-400 text-center">
+        Data updates hourly from monitoring stations worldwide
+      </p>
     </div>
   )
 }

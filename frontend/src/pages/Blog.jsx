@@ -70,12 +70,12 @@ export default function Blog() {
 
   if (selectedPost) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 py-10">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
             <button
               onClick={() => setSelectedPost(null)}
-              className="mb-6 text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-2"
+              className="mb-6 inline-flex items-center gap-2 px-4 py-2 text-indigo-600 hover:text-indigo-800 font-medium bg-white rounded-lg shadow-sm hover:shadow transition-all"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -83,44 +83,50 @@ export default function Blog() {
               Back to all posts
             </button>
 
-            <article className="bg-white rounded-lg shadow-lg p-8 md:p-12">
-              <header className="mb-8">
-                <h1 className="text-4xl font-bold text-gray-800 mb-4">
-                  {selectedPost.title}
-                </h1>
-                <div className="flex items-center text-gray-600 mb-4">
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  {selectedPost.date}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {selectedPost.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </header>
+            <article className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
+              <div className="h-3 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+              <div className="p-8 md:p-12">
+                <header className="mb-8">
+                  <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-4 leading-tight">
+                    {selectedPost.title}
+                  </h1>
+                  <div className="flex items-center text-gray-500 mb-4">
+                    <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center mr-3">
+                      <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <span className="text-sm font-medium">{selectedPost.date}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedPost.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="px-3 py-1 bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 rounded-full text-sm font-medium border border-indigo-100"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </header>
 
-              <div className="prose prose-lg max-w-none">
-                {selectedPost.content.split('\n\n').map((paragraph, idx) => {
-                  if (paragraph.startsWith('**') && paragraph.endsWith('**')) {
+                <div className="prose prose-lg max-w-none">
+                  {selectedPost.content.split('\n\n').map((paragraph, idx) => {
+                    if (paragraph.startsWith('**') && paragraph.endsWith('**')) {
+                      return (
+                        <h3 key={idx} className="text-xl font-bold text-gray-800 mt-8 mb-3 flex items-center gap-2">
+                          <span className="w-1.5 h-6 bg-indigo-500 rounded-full"></span>
+                          {paragraph.replace(/\*\*/g, '')}
+                        </h3>
+                      )
+                    }
                     return (
-                      <h3 key={idx} className="text-xl font-semibold text-gray-800 mt-6 mb-3">
-                        {paragraph.replace(/\*\*/g, '')}
-                      </h3>
+                      <p key={idx} className="text-gray-600 mb-4 leading-relaxed">
+                        {paragraph}
+                      </p>
                     )
-                  }
-                  return (
-                    <p key={idx} className="text-gray-700 mb-4 leading-relaxed">
-                      {paragraph}
-                    </p>
-                  )
-                })}
+                  })}
+                </div>
               </div>
             </article>
           </div>
@@ -130,66 +136,87 @@ export default function Blog() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 py-10">
       <div className="container mx-auto px-4">
         <header className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-gray-800 mb-3">
-            Thoughts on Air Pollution in India
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg mb-4">
+            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+            </svg>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 mb-3">
+            Air Quality Insights
           </h1>
-          <p className="text-gray-600 text-lg">
-            Insights, analysis, and perspectives on India's air quality challenges
+          <p className="text-gray-500 text-lg max-w-lg mx-auto">
+            Analysis, research, and perspectives on India's air quality challenges
           </p>
         </header>
 
-        <div className="max-w-4xl mx-auto space-y-6">
-          {SAMPLE_POSTS.map((post) => (
+        <div className="max-w-4xl mx-auto space-y-5">
+          {SAMPLE_POSTS.map((post, index) => (
             <article
               key={post.id}
-              className="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow cursor-pointer"
+              className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all cursor-pointer overflow-hidden border border-gray-100 group"
               onClick={() => setSelectedPost(post)}
             >
-              <div className="flex items-start justify-between mb-3">
-                <h2 className="text-2xl font-bold text-gray-800 hover:text-indigo-600 transition-colors">
-                  {post.title}
-                </h2>
-                <svg className="w-6 h-6 text-gray-400 flex-shrink-0 ml-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </div>
+              <div className="flex">
+                <div className={`w-1.5 flex-shrink-0 bg-gradient-to-b ${
+                  index === 0 ? 'from-red-400 to-orange-500' :
+                  index === 1 ? 'from-blue-400 to-indigo-500' :
+                  'from-emerald-400 to-teal-500'
+                }`}></div>
+                <div className="p-6 flex-1">
+                  <div className="flex items-start justify-between mb-3">
+                    <h2 className="text-xl md:text-2xl font-bold text-gray-800 group-hover:text-indigo-600 transition-colors">
+                      {post.title}
+                    </h2>
+                    <div className="w-8 h-8 bg-gray-50 rounded-full flex items-center justify-center flex-shrink-0 ml-4 group-hover:bg-indigo-50 transition-colors">
+                      <svg className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  </div>
 
-              <div className="flex items-center text-gray-500 text-sm mb-3">
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                {post.date}
-              </div>
+                  <div className="flex items-center text-gray-400 text-sm mb-3">
+                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    {post.date}
+                  </div>
 
-              <p className="text-gray-600 mb-4 leading-relaxed">
-                {post.excerpt}
-              </p>
+                  <p className="text-gray-500 mb-4 leading-relaxed">
+                    {post.excerpt}
+                  </p>
 
-              <div className="flex flex-wrap gap-2">
-                {post.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-sm"
-                  >
-                    {tag}
-                  </span>
-                ))}
+                  <div className="flex flex-wrap gap-2">
+                    {post.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="px-2.5 py-1 bg-gray-50 text-gray-600 rounded-lg text-xs font-medium"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
             </article>
           ))}
         </div>
 
-        <div className="max-w-4xl mx-auto mt-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg shadow-lg p-8 text-white text-center">
-          <h3 className="text-2xl font-bold mb-3">Want to Share Your Thoughts?</h3>
-          <p className="mb-4 opacity-90">
-            Have insights about air pollution in India? We'd love to hear from you.
-          </p>
-          <button className="bg-white text-indigo-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
-            Contribute a Post
-          </button>
+        <div className="max-w-4xl mx-auto mt-12">
+          <div className="relative bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-2xl shadow-xl p-8 text-white text-center overflow-hidden">
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYSIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVHJhbnNmb3JtPSJyb3RhdGUoNDUpIj48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjYSkiLz48L3N2Zz4=')] opacity-50"></div>
+            <div className="relative">
+              <h3 className="text-2xl font-bold mb-3">Want to Share Your Thoughts?</h3>
+              <p className="mb-5 opacity-90 max-w-md mx-auto">
+                Have insights about air quality in India? We'd love to hear from you.
+              </p>
+              <button className="bg-white text-indigo-600 px-6 py-3 rounded-xl font-semibold hover:bg-gray-50 transition-colors shadow-lg">
+                Contribute a Post
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
