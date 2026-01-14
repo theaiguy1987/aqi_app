@@ -75,17 +75,34 @@ git checkout google-cloud-run
 gcloud config set project YOUR_PROJECT_ID
 ```
 
-### Step 3: Set Up OpenAQ API Key
+### Step 3: Set Up API Keys
 
-The app fetches live air quality data from OpenAQ. You need a free API key:
+The app needs two API keys:
 
-1. Go to [openaq.org](https://openaq.org) and create an account
-2. Get your API key from your profile
+#### AQICN API Token (Required)
+Fetches live air quality data:
+
+1. Go to [aqicn.org/data-platform/token](https://aqicn.org/data-platform/token/) and create a free account
+2. Get your API token from your profile
 3. Set it as an environment variable:
 
 ```bash
-export OPEN_AQ_API=your_api_key_here
+export AQICN_API_TOKEN=your_token_here
 ```
+
+#### Google Maps API Key (Optional but Recommended)
+Enables location autocomplete:
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/google/maps-apis/)
+2. Enable **Places API (New)** for your project
+3. Create an API key
+4. Set it as an environment variable:
+
+```bash
+export GOOGLE_MAPS_API_KEY=your_key_here
+```
+
+> 💡 **Without Google Maps API**: Users can still use GPS location or enter coordinates manually.
 
 ### Step 4: Deploy!
 
@@ -93,7 +110,7 @@ export OPEN_AQ_API=your_api_key_here
 # Make script executable
 chmod +x deploy.sh
 
-# Run deployment (uses OPEN_AQ_API from environment)
+# Run deployment (uses AQICN_API_TOKEN and GOOGLE_MAPS_API_KEY from environment)
 ./deploy.sh
 ```
 
@@ -140,29 +157,30 @@ cd backend
 # Build Docker image
 gcloud builds submit --tag gcr.io/$PROJECT_ID/aqi-backend
 
-# Deploy to Cloud Run (with OpenAQ API key)
+# Deploy to Cloud Run (with AQICN API token)
 gcloud run deploy aqi-backend \
     --image gcr.io/$PROJECT_ID/aqi-backend \
     --region $REGION \
     --platform managed \
     --allow-unauthenticated \
     --port 8080 \
-    --set-env-vars "OPEN_AQ_API=your_openaq_api_key_here"
+    --set-env-vars "AQICN_API_TOKEN=your_aqicn_token_here"
 
 # Get the URL
 BACKEND_URL=$(gcloud run services describe aqi-backend --region=$REGION --format='value(status.url)')
 echo "Backend: $BACKEND_URL"
 ```
 
-**Note:** Get your free OpenAQ API key at [openaq.org](https://openaq.org)
+**Note:** Get your free AQICN API token at [aqicn.org/data-platform/token](https://aqicn.org/data-platform/token/)
 
 ### Step 4: Deploy Frontend
 
 ```bash
 cd ../frontend
 
-# Create environment file with backend URL
+# Create environment file with backend URL and Google Maps API key
 echo "VITE_API_URL=$BACKEND_URL" > .env.production
+echo "VITE_GOOGLE_MAPS_API_KEY=your_google_maps_key_here" >> .env.production
 
 # Build Docker image
 gcloud builds submit --tag gcr.io/$PROJECT_ID/aqi-frontend
@@ -179,6 +197,8 @@ gcloud run deploy aqi-frontend \
 FRONTEND_URL=$(gcloud run services describe aqi-frontend --region=$REGION --format='value(status.url)')
 echo "Frontend: $FRONTEND_URL"
 ```
+
+> 💡 **Google Maps API**: If you skip `VITE_GOOGLE_MAPS_API_KEY`, location autocomplete won't work, but users can still use GPS.
 
 ---
 
@@ -204,13 +224,14 @@ Public URL (anyone can access)
 ```python
 # Read when server RUNS
 port = os.environ.get("PORT", 8000)
-api_key = os.environ.get("OPEN_AQ_API")  # For OpenAQ live data
+api_key = os.environ.get("AQICN_API_TOKEN")  # For AQICN live data
 ```
 
 **Frontend (React)** - Build-time variables:
 ```javascript
 // Read when code is BUILT, not when it runs!
 const API_URL = import.meta.env.VITE_API_URL
+const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
 ```
 
 **Important:** The frontend's API URL must be set BEFORE building the Docker image!
@@ -218,21 +239,21 @@ const API_URL = import.meta.env.VITE_API_URL
 ### Data Flow in Production
 
 ```
-User selects city/station on Frontend
+User selects location on Frontend (via Google Places API)
     ↓
-Frontend calls Backend /aqi/live endpoint
+Frontend calls Backend /aqi/location endpoint with coordinates
     ↓
-Backend fetches live data from OpenAQ API
+Backend fetches live data from AQICN API
     ↓
-Backend calculates AQI using EPA standards
+Backend calculates Indian NAQI from EPA values
     ↓
-Result displayed with real measurements
+Result displayed with NAQI and EPA comparison
 ```
 
 That's why `deploy.sh`:
 1. Deploys backend first
 2. Gets backend URL
-3. Creates `.env.production` with that URL
+3. Creates `.env.production` with backend URL and Google Maps API key
 4. THEN builds frontend
 
 ---
@@ -306,6 +327,7 @@ gcloud run logs tail aqi-frontend --region=us-central1
 # In Cloud Shell
 cd ~/aqi_app
 echo "VITE_API_URL=$BACKEND_URL" > frontend/.env.production
+echo "VITE_GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY" >> frontend/.env.production
 ./deploy.sh
 ```
 
@@ -380,6 +402,8 @@ gcloud run services delete SERVICE_NAME --region=us-central1
 - [ ] Repository cloned
 - [ ] `google-cloud-run` branch checked out
 - [ ] Project ID set: `gcloud config set project YOUR_ID`
+- [ ] AQICN API token obtained and set: `export AQICN_API_TOKEN=...`
+- [ ] (Optional) Google Maps API key obtained and set: `export GOOGLE_MAPS_API_KEY=...`
 - [ ] Deploy script run: `./deploy.sh`
 - [ ] Frontend URL works in browser
 - [ ] Calculator works end-to-end
