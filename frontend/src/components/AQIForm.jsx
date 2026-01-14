@@ -93,9 +93,16 @@ function AQIForm({ onSubmit, loading }) {
     debounceTimerRef.current = setTimeout(async () => {
       try {
         // Use the new AutocompleteSuggestion API
+        // No type restriction - allows any location: cities, landmarks, addresses, parks, etc.
         const { suggestions } = await window.google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
           input: locationInput,
-          includedPrimaryTypes: ['locality', 'administrative_area_level_1', 'administrative_area_level_2', 'country'],
+          // Removed includedPrimaryTypes to allow ALL location types:
+          // - Cities, towns, villages
+          // - Landmarks (Taj Mahal, India Gate, etc.)
+          // - Addresses (123 Main St)
+          // - Parks, monuments, buildings
+          // - Businesses, schools, hospitals
+          // - ANY geocodable location
         })
 
         if (suggestions && suggestions.length > 0) {
