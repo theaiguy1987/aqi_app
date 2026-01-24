@@ -39,7 +39,7 @@ class AQICNClient:
     
     def __init__(self, api_token: Optional[str] = None):
         """Initialize the AQICN client with API token from environment."""
-        self.api_token = api_token or os.getenv("AQICN_API_TOKEN")
+        self.api_token = (api_token or os.getenv("AQICN_API_TOKEN", "")).strip()
         
         if not self.api_token:
             print("WARNING: AQICN_API_TOKEN not set. API calls will fail.")

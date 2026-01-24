@@ -36,6 +36,7 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+frontend/.env.production
 
 # Logs
 logs/
