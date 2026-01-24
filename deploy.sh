@@ -52,8 +52,7 @@ gcloud run deploy $BACKEND_SERVICE \
     --region $REGION \
     --platform managed \
     --allow-unauthenticated \
-    --port 8080 \
-    --set-env-vars "AQICN_API_TOKEN=$AQICN_API_TOKEN"
+    --port 8080
 
 # Get backend URL
 BACKEND_URL=$(gcloud run services describe $BACKEND_SERVICE --region=$REGION --format='value(status.url)')
