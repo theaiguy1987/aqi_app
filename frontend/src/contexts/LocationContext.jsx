@@ -5,16 +5,32 @@ const LocationContext = createContext(null)
 // API URL from environment variable, fallback to localhost for development
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
+// Helper to get cached data from sessionStorage
+const getCachedData = () => {
+  try {
+    const cached = sessionStorage.getItem('aqiCache')
+    if (cached) {
+      return JSON.parse(cached)
+    }
+  } catch (e) {
+    console.error('Error reading cache:', e)
+  }
+  return null
+}
+
 export function LocationProvider({ children }) {
+  // Initialize from cache if available
+  const cached = getCachedData()
+  
   // Location state
-  const [selectedLocation, setSelectedLocation] = useState(null)
-  const [locationInput, setLocationInput] = useState('')
+  const [selectedLocation, setSelectedLocation] = useState(cached?.location || null)
+  const [locationInput, setLocationInput] = useState(cached?.locationInput || '')
   const [locationError, setLocationError] = useState(null)
   const [gettingLocation, setGettingLocation] = useState(false)
-  const [locationPermission, setLocationPermission] = useState('prompt') // 'prompt', 'granted', 'denied'
+  const [locationPermission, setLocationPermission] = useState(cached ? 'granted' : 'prompt')
   
-  // AQI data state
-  const [aqiData, setAqiData] = useState(null)
+  // AQI data state - initialize from cache
+  const [aqiData, setAqiData] = useState(cached?.aqiData || null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -39,10 +55,7 @@ export function LocationProvider({ children }) {
 
       const data = await response.json()
       
-      // Mark that we have location data for this session
-      sessionStorage.setItem('hasLocationData', 'true')
-      
-      setAqiData({
+      const newAqiData = {
         aqi: data.aqi,
         category: data.category,
         color: data.color,
@@ -58,7 +71,17 @@ export function LocationProvider({ children }) {
         attributions: data.attributions,
         aqi_standard: data.aqi_standard,
         pollutant_breakdown: data.pollutant_breakdown
-      })
+      }
+      
+      setAqiData(newAqiData)
+      
+      // Cache data for page refresh
+      sessionStorage.setItem('aqiCache', JSON.stringify({
+        aqiData: newAqiData,
+        location: { latitude, longitude },
+        locationInput: locationInput,
+        timestamp: Date.now()
+      }))
     } catch (err) {
       setError(err.message || 'An error occurred while fetching AQI data')
     } finally {
@@ -117,13 +140,10 @@ export function LocationProvider({ children }) {
     )
   }, [fetchAQI])
 
-  // Auto-request location on first load
+  // Auto-request location on first load (only if no cached data)
   useEffect(() => {
-    // Check if we've already successfully got location data in this session
-    const hasLocationData = sessionStorage.getItem('hasLocationData')
-    
-    if (hasLocationData) {
-      // We already have data, don't re-request
+    // If we have cached data, don't re-request
+    if (aqiData) {
       return
     }
 
@@ -131,24 +151,20 @@ export function LocationProvider({ children }) {
     if (navigator.permissions && navigator.permissions.query) {
       navigator.permissions.query({ name: 'geolocation' }).then((result) => {
         if (result.state === 'granted') {
-          // Permission already granted, get location
           getCurrentLocation()
         } else if (result.state === 'prompt') {
-          // Will prompt user - try to get location
           getCurrentLocation()
         } else {
-          // Permission denied - update state so UI shows search message
           setLocationPermission('denied')
         }
       }).catch(() => {
-        // Permissions API not supported, try anyway
         getCurrentLocation()
       })
     } else if (navigator.geolocation) {
-      // Fallback: just try to get location
       getCurrentLocation()
     }
-  }, []) // Empty dependency - run only once on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Run only once on mount
 
   // Update location from a selected place
   const updateLocation = useCallback((location) => {

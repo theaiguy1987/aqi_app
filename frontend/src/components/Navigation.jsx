@@ -4,6 +4,11 @@ import { useLocation } from '../contexts/LocationContext'
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
 
+// Debug: log if API key is available
+if (!GOOGLE_MAPS_API_KEY) {
+  console.warn('Google Maps API key not configured - location search will not work')
+}
+
 export default function Navigation() {
   const routerLocation = useRouterLocation()
   const { 
@@ -96,17 +101,46 @@ export default function Navigation() {
 
     debounceTimerRef.current = setTimeout(async () => {
       try {
-        const { suggestions } = await window.google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
-          input: locationInput,
-        })
-
-        if (suggestions && suggestions.length > 0) {
-          const formattedPredictions = suggestions.slice(0, 5).map(suggestion => ({
-            placeId: suggestion.placePrediction.placeId,
-            mainText: suggestion.placePrediction.mainText?.text || '',
-            secondaryText: suggestion.placePrediction.secondaryText?.text || '',
-            description: suggestion.placePrediction.text?.text || '',
+        // Try new API first, fall back to old AutocompleteService
+        let formattedPredictions = []
+        
+        if (window.google.maps.places.AutocompleteSuggestion) {
+          // New Places API
+          const { suggestions } = await window.google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+            input: locationInput,
+          })
+          if (suggestions && suggestions.length > 0) {
+            formattedPredictions = suggestions.slice(0, 5).map(suggestion => ({
+              placeId: suggestion.placePrediction.placeId,
+              mainText: suggestion.placePrediction.mainText?.text || '',
+              secondaryText: suggestion.placePrediction.secondaryText?.text || '',
+              description: suggestion.placePrediction.text?.text || '',
+            }))
+          }
+        } else if (window.google.maps.places.AutocompleteService) {
+          // Fallback to old API
+          const service = new window.google.maps.places.AutocompleteService()
+          const results = await new Promise((resolve, reject) => {
+            service.getPlacePredictions(
+              { input: locationInput, types: ['(cities)'] },
+              (predictions, status) => {
+                if (status === 'OK' && predictions) {
+                  resolve(predictions)
+                } else {
+                  resolve([])
+                }
+              }
+            )
+          })
+          formattedPredictions = results.slice(0, 5).map(p => ({
+            placeId: p.place_id,
+            mainText: p.structured_formatting?.main_text || p.description.split(',')[0],
+            secondaryText: p.structured_formatting?.secondary_text || '',
+            description: p.description,
           }))
+        }
+        
+        if (formattedPredictions.length > 0) {
           setPredictions(formattedPredictions)
           setShowPredictions(true)
         } else {
@@ -135,18 +169,36 @@ export default function Navigation() {
     setIsMobileSearchOpen(false)
 
     try {
-      const place = new window.google.maps.places.Place({
-        id: prediction.placeId,
-      })
-      
-      await place.fetchFields({ fields: ['location', 'displayName'] })
-      
-      if (place.location) {
-        setSelectedLocation({
-          name: prediction.description,
-          latitude: place.location.lat(),
-          longitude: place.location.lng()
+      // Try new Place class first, fall back to PlacesService
+      if (window.google.maps.places.Place) {
+        const place = new window.google.maps.places.Place({
+          id: prediction.placeId,
         })
+        
+        await place.fetchFields({ fields: ['location', 'displayName'] })
+        
+        if (place.location) {
+          setSelectedLocation({
+            name: prediction.description,
+            latitude: place.location.lat(),
+            longitude: place.location.lng()
+          })
+        }
+      } else if (window.google.maps.places.PlacesService) {
+        // Fallback to old PlacesService
+        const service = new window.google.maps.places.PlacesService(document.createElement('div'))
+        service.getDetails(
+          { placeId: prediction.placeId, fields: ['geometry', 'name'] },
+          (place, status) => {
+            if (status === 'OK' && place?.geometry?.location) {
+              setSelectedLocation({
+                name: prediction.description,
+                latitude: place.geometry.location.lat(),
+                longitude: place.geometry.location.lng()
+              })
+            }
+          }
+        )
       }
     } catch (err) {
       console.error('Error fetching place details:', err)
@@ -204,7 +256,7 @@ export default function Navigation() {
           </div>
 
           {/* Location Search Bar - Desktop */}
-          <div ref={wrapperRef} className="hidden md:flex flex-1 max-w-md relative">
+          <div ref={wrapperRef} className="hidden md:block flex-1 max-w-md mx-4 relative">
             <div className="w-full relative">
               <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
