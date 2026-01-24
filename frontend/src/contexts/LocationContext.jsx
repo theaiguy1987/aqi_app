@@ -39,6 +39,9 @@ export function LocationProvider({ children }) {
 
       const data = await response.json()
       
+      // Mark that we have location data for this session
+      sessionStorage.setItem('hasLocationData', 'true')
+      
       setAqiData({
         aqi: data.aqi,
         category: data.category,
@@ -116,17 +119,36 @@ export function LocationProvider({ children }) {
 
   // Auto-request location on first load
   useEffect(() => {
-    // Check if we've already tried to get location
-    const hasAskedPermission = sessionStorage.getItem('locationPermissionAsked')
+    // Check if we've already successfully got location data in this session
+    const hasLocationData = sessionStorage.getItem('hasLocationData')
     
-    if (!hasAskedPermission && navigator.geolocation) {
-      // Mark that we're asking for permission
-      sessionStorage.setItem('locationPermissionAsked', 'true')
-      
-      // Request location automatically
+    if (hasLocationData) {
+      // We already have data, don't re-request
+      return
+    }
+
+    // Check browser's permission state if available
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+        if (result.state === 'granted') {
+          // Permission already granted, get location
+          getCurrentLocation()
+        } else if (result.state === 'prompt') {
+          // Will prompt user - try to get location
+          getCurrentLocation()
+        } else {
+          // Permission denied - update state so UI shows search message
+          setLocationPermission('denied')
+        }
+      }).catch(() => {
+        // Permissions API not supported, try anyway
+        getCurrentLocation()
+      })
+    } else if (navigator.geolocation) {
+      // Fallback: just try to get location
       getCurrentLocation()
     }
-  }, [getCurrentLocation])
+  }, []) // Empty dependency - run only once on mount
 
   // Update location from a selected place
   const updateLocation = useCallback((location) => {
