@@ -77,12 +77,8 @@ class LocationAQIResponse(BaseModel):
     aqi: Optional[int] = None
     category: str
     color: str
-    aqi_standard: Optional[str] = None  # "NAQI (India)" or "EPA (US)"
-    epa_aqi: Optional[int] = None  # Original EPA AQI from AQICN
-    epa_category: Optional[str] = None
-    epa_color: Optional[str] = None
-    naqi_breakdown: Optional[dict] = None  # Individual NAQI per pollutant
-    concentrations: Optional[dict] = None  # Estimated concentrations in μg/m³
+    aqi_standard: Optional[str] = None  # "EPA (US)"
+    pollutant_breakdown: Optional[dict] = None  # Individual pollutant AQI values
     dominant_pollutant: str
     message: str
     measurements: List[MeasurementResponse]
@@ -185,13 +181,8 @@ async def get_aqi_by_location(request: LocationAQIRequest):
             forecast=data.get("forecast"),
             attributions=data.get("attributions"),
             fetched_at=data.get("fetched_at", datetime.utcnow().isoformat() + "Z"),
-            # Indian NAQI fields
             aqi_standard=data.get("aqi_standard", "EPA (US)"),
-            epa_aqi=data.get("epa_aqi"),
-            epa_category=data.get("epa_category"),
-            epa_color=data.get("epa_color"),
-            naqi_breakdown=data.get("naqi_breakdown"),
-            concentrations=data.get("concentrations")
+            pollutant_breakdown=data.get("pollutant_breakdown")
         )
     
     except Exception as e:

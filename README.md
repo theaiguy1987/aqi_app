@@ -8,14 +8,14 @@ A real-time **Air Quality Index** web application that helps you check air pollu
 
 ## 🎯 What Does This App Do?
 
-1. **Enter any location** (city, address, or landmark)
+1. **Automatically detects your location** (or search for any place)
 2. **Get real-time air quality data** from monitoring stations worldwide
-3. **See results visually** with color-coded AQI, health advice, and forecasts
+3. **See results visually** with color-coded AQI, cigarette equivalent, and health advice
 
 ```
 ✅ Works globally - check air quality in Delhi, Tokyo, New York, anywhere!
 ✅ Real-time data from World Air Quality Index Project (WAQI)
-✅ Health recommendations based on current pollution levels
+✅ Health recommendations and cigarette equivalent based on pollution levels
 ```
 
 ---
@@ -27,11 +27,14 @@ graph TB
     subgraph "Your Computer"
         subgraph "Frontend - React"
             UI[Web Interface<br/>localhost:3000]
+            NAV[Navigation with<br/>Location Search]
+            CALC[Calculator Page]
+            RESULT[AQI Result Display]
+            CTX[Location Context<br/>Shared State]
         end
         
         subgraph "Backend - Python"
             API[FastAPI Server<br/>localhost:8000]
-            CALC[AQI Calculator]
             CLIENT[AQICN Client]
         end
     end
@@ -41,17 +44,20 @@ graph TB
         GOOGLE[Google Places API<br/>Location Autocomplete]
     end
     
-    User((User)) --> UI
-    UI -->|HTTP Request| API
-    API --> CALC
+    User((User)) --> NAV
+    NAV --> CTX
+    CTX --> CALC
+    CALC --> RESULT
+    CTX -->|HTTP Request| API
     API --> CLIENT
     CLIENT -->|Fetch Data| AQICN
-    UI -.->|Optional| GOOGLE
+    NAV -.->|Optional| GOOGLE
     
     style UI fill:#61dafb
     style API fill:#009688
     style AQICN fill:#ff9800
     style GOOGLE fill:#4285f4
+    style CTX fill:#a855f7
 ```
 
 ### The Restaurant Analogy 🍽️
@@ -61,6 +67,8 @@ Think of this application like a restaurant:
 | Component | Restaurant | Our App | Technology |
 |-----------|------------|---------|------------|
 | **Frontend** | Dining room (what customers see) | Web interface | React |
+| **Navigation** | Host/Hostess (takes your order) | Location search bar | React + Google Places |
+| **Context** | Kitchen ticket system | Shared state management | React Context |
 | **Backend** | Kitchen (where food is prepared) | API server | Python + FastAPI |
 | **External API** | Food suppliers | AQICN (air quality data) | HTTP requests |
 
@@ -80,6 +88,7 @@ aqi_app/
 ├── frontend/                ← React code
 │   ├── src/
 │   │   ├── App.jsx          ← Main app with routing
+│   │   ├── contexts/        ← Shared state (LocationContext)
 │   │   ├── pages/           ← Full page components
 │   │   └── components/      ← Reusable UI pieces
 │   ├── package.json         ← Node.js dependencies
@@ -105,6 +114,40 @@ aqi_app/
 Then open http://localhost:3000
 
 > 📖 For detailed setup instructions, see [LOCAL_SETUP.md](LOCAL_SETUP.md)
+
+---
+
+## ✨ Key Features
+
+### 1. Automatic Location Detection
+When you first visit the app, it automatically asks for your location permission. If granted, it fetches AQI data immediately!
+
+```mermaid
+flowchart LR
+    A[Page Load] --> B{Location<br/>Permission?}
+    B -->|Granted| C[Get GPS Coords]
+    B -->|Denied| D[Show Search Bar]
+    C --> E[Fetch AQI Data]
+    D --> F[User Searches Location]
+    F --> E
+    E --> G[Display Results]
+```
+
+### 2. Location Search in Header
+The search bar is always accessible in the navigation, making it easy to check air quality for any location at any time.
+
+### 3. Cigarette Equivalent Display
+Based on Berkeley Earth research, we calculate how many cigarettes per day the air pollution is equivalent to - making the impact more tangible.
+
+### 4. Modern, Responsive UI
+Clean design with:
+- Large, readable AQI display with color coding
+- Station information
+- Cigarette equivalent with explanation
+- Health advice
+- Pollutant breakdown
+- Weather conditions
+- 3-day forecast
 
 ---
 
@@ -142,7 +185,43 @@ graph LR
 | **Props** | Function arguments | `def greet(name): ...` |
 | **State** | Variables that trigger UI updates | No direct equivalent - closest is a class attribute |
 | **`useState()`** | Creating a reactive variable | `count, setCount = useState(0)` |
+| **Context** | Global variables accessible anywhere | Like Flask's `g` object |
 | **`fetch()`** | `requests.get()` / `requests.post()` | Same concept! |
+
+### Understanding React Context
+
+Our app uses React Context to share location and AQI data across components:
+
+```mermaid
+graph TB
+    subgraph "LocationContext Provider"
+        CTX[Location Context]
+        CTX --> |selectedLocation| NAV[Navigation]
+        CTX --> |aqiData| CALC[Calculator]
+        CTX --> |loading, error| CALC
+        NAV --> |setSelectedLocation| CTX
+    end
+    
+    style CTX fill:#a855f7
+```
+
+**Python equivalent (conceptually):**
+```python
+# Like a global state manager
+class LocationContext:
+    selected_location = None
+    aqi_data = None
+    loading = False
+    error = None
+    
+    def fetch_aqi(self, lat, lng):
+        self.loading = True
+        self.aqi_data = requests.get(f"/aqi/location?lat={lat}&lng={lng}").json()
+        self.loading = False
+
+# All components can access and modify this
+location_ctx = LocationContext()
+```
 
 ### Side-by-Side Comparison
 
@@ -189,35 +268,24 @@ setCount(count + 1)  // UI automatically shows new value!
 ```jsx
 // 1. Import statements (like Python imports)
 import { useState } from 'react'
-import AQIResult from './components/AQIResult'
+import { useLocation } from '../contexts/LocationContext'
 
 // 2. Component definition (like a Python function)
 function Calculator() {
-    // 3. State variables (reactive variables)
-    const [aqi, setAqi] = useState(null)
-    const [loading, setLoading] = useState(false)
+    // 3. Use context for shared state
+    const { aqiData, loading, error } = useLocation()
     
-    // 4. Regular function (same as Python!)
-    const handleSubmit = async () => {
-        setLoading(true)
-        const response = await fetch('/api/aqi')  // Like requests.get()
-        const data = await response.json()
-        setAqi(data)
-        setLoading(false)
-    }
-    
-    // 5. Return JSX (HTML-like syntax)
+    // 4. Return JSX (HTML-like syntax)
     return (
         <div>
-            <h1>AQI Calculator</h1>
-            <button onClick={handleSubmit}>Get AQI</button>
             {loading && <p>Loading...</p>}
-            {aqi && <AQIResult data={aqi} />}
+            {error && <p>Error: {error}</p>}
+            {aqiData && <AQIResult data={aqiData} />}
         </div>
     )
 }
 
-// 6. Export (makes it available to other files)
+// 5. Export (makes it available to other files)
 export default Calculator
 ```
 
@@ -261,35 +329,49 @@ In JSX (React's HTML-like syntax), curly braces `{}` mean "execute this JavaScri
 | File | Why It's Important | Difficulty |
 |------|-------------------|------------|
 | `backend/main.py` | API endpoints - you know this! | ⭐ Easy |
-| `backend/aqi_calculator.py` | Pure Python logic | ⭐ Easy |
-| `frontend/src/App.jsx` | See how React routing works | ⭐⭐ Medium |
-| `frontend/src/pages/Calculator.jsx` | Main page with API calls | ⭐⭐ Medium |
-| `frontend/src/components/AQIResult.jsx` | UI component example | ⭐⭐ Medium |
+| `backend/aqicn_client.py` | Fetches and formats AQI data | ⭐ Easy |
+| `frontend/src/contexts/LocationContext.jsx` | Shared state management | ⭐⭐ Medium |
+| `frontend/src/components/Navigation.jsx` | Location search in header | ⭐⭐ Medium |
+| `frontend/src/pages/Calculator.jsx` | Main page using context | ⭐⭐ Medium |
+| `frontend/src/components/AQIResult.jsx` | UI component with cigarette equivalent | ⭐⭐ Medium |
 
 ---
 
 ## 📊 Data Flow
 
-Here's how data moves through the application when you search for a location:
+Here's how data moves through the application when you visit the page:
 
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant F as Frontend (React)
+    participant N as Navigation
+    participant C as LocationContext
+    participant P as Calculator Page
     participant B as Backend (Python)
     participant A as AQICN API
 
-    U->>F: Types "Delhi, India"
-    F->>F: Google Places autocomplete
-    U->>F: Selects location
-    F->>F: Gets coordinates (28.6, 77.2)
-    F->>B: POST /aqi/location {lat: 28.6, lng: 77.2}
+    U->>N: Visits page
+    N->>C: Request location permission
+    C->>C: navigator.geolocation
+    Note over C: Auto-fetch on permission granted
+    C->>B: POST /aqi/location {lat, lng}
     B->>A: GET feed for coordinates
     A-->>B: Raw AQI data
-    B->>B: Calculate AQI category & message
-    B-->>F: JSON {aqi: 156, category: "Unhealthy", ...}
-    F->>F: Update UI state
-    F-->>U: Shows orange card with AQI 156
+    B-->>C: JSON {aqi, category, message, ...}
+    C->>P: Update aqiData state
+    P->>U: Shows AQI card with results
+
+    Note over U,N: Or user searches manually
+    U->>N: Types "Delhi, India"
+    N->>N: Google Places autocomplete
+    U->>N: Selects location
+    N->>C: setSelectedLocation({lat, lng})
+    C->>B: POST /aqi/location
+    B->>A: GET feed
+    A-->>B: Data
+    B-->>C: Response
+    C->>P: Update state
+    P->>U: Display results
 ```
 
 ---
@@ -314,4 +396,5 @@ MIT License - feel free to use this for learning or as a starting point for your
 ## 🙏 Acknowledgments
 
 - Air quality data from [World Air Quality Index Project](https://waqi.info/)
+- Cigarette equivalent research from [Berkeley Earth](http://berkeleyearth.org/)
 - Built with [FastAPI](https://fastapi.tiangolo.com/) and [React](https://react.dev/)

@@ -220,15 +220,18 @@ def fetch_aqi_by_location(latitude: float, longitude: float) -> Dict:
     Convenience function to fetch AQI data by coordinates.
     
     This is the main function called by the API endpoint.
-    Returns data formatted for the frontend, including both EPA AQI and Indian NAQI.
+    Returns data formatted for the frontend.
+    
+    Note: The AQICN API already provides AQI values directly, so we use them as-is
+    rather than recalculating from concentrations.
     """
     client = get_aqicn_client()
     data = client.get_aqi_by_coordinates(latitude, longitude)
     
-    # Get EPA AQI category and color (this is what AQICN provides)
-    epa_aqi = data.get("aqi")
-    epa_category, epa_color = get_aqi_category(epa_aqi) if epa_aqi else ("Unknown", "#808080")
-    epa_message = get_health_message(epa_aqi) if epa_aqi else "No data available"
+    # Get AQI directly from API - this is the primary value
+    aqi = data.get("aqi")
+    category, color = get_aqi_category(aqi) if aqi else ("Unknown", "#808080")
+    message = get_health_message(aqi) if aqi else "No data available"
     
     # Format pollutants for display
     measurements = []
@@ -260,8 +263,8 @@ def fetch_aqi_by_location(latitude: float, longitude: float) -> Dict:
         "wg": "m/s"
     }
     
-    # Collect EPA AQI values for NAQI conversion
-    epa_aqi_values = {}
+    # Collect individual pollutant AQI values
+    pollutant_aqis = {}
     
     for param, value in data.get("pollutants", {}).items():
         measurements.append({
@@ -270,40 +273,25 @@ def fetch_aqi_by_location(latitude: float, longitude: float) -> Dict:
             "value": value,
             "unit": pollutant_units.get(param, "AQI")
         })
-        # Store air quality pollutants for NAQI calculation
+        # Store air quality pollutants
         if param in ['pm25', 'pm10', 'o3', 'no2', 'so2', 'co']:
-            epa_aqi_values[param] = value
-    
-    # Calculate Indian NAQI from EPA AQI values
-    naqi_data = calculate_naqi_from_epa_aqi(epa_aqi_values)
-    
-    # Use Indian NAQI as the primary display value (if available)
-    # The overall AQI is now based on Indian standards
-    display_aqi = naqi_data.get('naqi') if naqi_data.get('naqi') else epa_aqi
-    display_category = naqi_data.get('naqi_category', epa_category)
-    display_color = naqi_data.get('naqi_color', epa_color)
-    display_message = naqi_data.get('naqi_message', epa_message)
+            pollutant_aqis[pollutant_display_names.get(param, param.upper())] = value
     
     return {
         "station_id": data.get("station_id"),
         "station_name": data.get("station_name"),
         "station_url": data.get("station_url"),
         "coordinates": data.get("coordinates"),
-        # Primary AQI (now Indian NAQI)
-        "aqi": display_aqi,
-        "category": display_category,
-        "color": display_color,
-        "message": display_message,
-        "aqi_standard": "NAQI (India)" if naqi_data.get('naqi') else "EPA (US)",
-        # Also include EPA AQI for reference
-        "epa_aqi": epa_aqi,
-        "epa_category": epa_category,
-        "epa_color": epa_color,
-        # NAQI breakdown
-        "naqi_breakdown": naqi_data.get('individual_naqi'),
-        "concentrations": naqi_data.get('concentrations'),
+        # Use AQI directly from API (EPA standard from AQICN)
+        "aqi": aqi,
+        "category": category,
+        "color": color,
+        "message": message,
+        "aqi_standard": "EPA (US)",
+        # Individual pollutant breakdown (these are already AQI sub-indices from AQICN)
+        "pollutant_breakdown": pollutant_aqis if pollutant_aqis else None,
         # Other data
-        "dominant_pollutant": naqi_data.get('naqi_dominant', data.get("dominant_pollutant", "Unknown")),
+        "dominant_pollutant": data.get("dominant_pollutant", "Unknown"),
         "measurements": measurements,
         "measurement_time": data.get("measurement_time"),
         "forecast": data.get("forecast"),

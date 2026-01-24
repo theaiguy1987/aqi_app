@@ -28,17 +28,12 @@ graph TB
         EP1["/health"]
         EP2["/aqi/location"]
         EP3["/search"]
-        EP4["/calculate-aqi"]
     end
     
     subgraph "aqicn_client.py - Data Layer"
         FETCH[fetch_aqi_by_location]
         SEARCH[search_stations]
-    end
-    
-    subgraph "aqi_calculator.py - Logic Layer"
-        CALC[calculate_aqi]
-        CAT[get_aqi_category]
+        FORMAT[Format response]
     end
     
     subgraph "External"
@@ -47,24 +42,43 @@ graph TB
     
     EP2 --> FETCH
     EP3 --> SEARCH
-    EP4 --> CALC
     FETCH --> AQICN
-    FETCH --> CAT
+    FETCH --> FORMAT
     SEARCH --> AQICN
     
     style EP1 fill:#4caf50
     style EP2 fill:#2196f3
     style EP3 fill:#2196f3
-    style EP4 fill:#ff9800
+```
+
+### Data Flow for /aqi/location
+
+```mermaid
+sequenceDiagram
+    participant Frontend
+    participant main.py
+    participant aqicn_client.py
+    participant AQICN API
+
+    Frontend->>main.py: POST /aqi/location {lat, lng}
+    main.py->>aqicn_client.py: fetch_aqi_by_location(lat, lng)
+    aqicn_client.py->>AQICN API: GET /feed/geo:lat;lng
+    AQICN API-->>aqicn_client.py: Raw JSON data
+    Note over aqicn_client.py: Extract AQI, station info,<br/>pollutants, forecast
+    aqicn_client.py-->>main.py: Formatted dict
+    main.py-->>Frontend: JSON response
 ```
 
 ### Separation of Concerns
 
 | File | Responsibility | Depends On |
 |------|---------------|------------|
-| `main.py` | HTTP handling, request/response | Both other files |
-| `aqicn_client.py` | External API communication | `aqi_calculator.py` |
-| `aqi_calculator.py` | Pure calculation logic | Nothing (standalone) |
+| `main.py` | HTTP handling, request/response | `aqicn_client.py` |
+| `aqicn_client.py` | External API communication & formatting | Nothing |
+| `aqi_calculator.py` | Pure calculation logic (for manual input) | Nothing |
+
+> 💡 **Simplified Architecture**: The AQICN API provides pre-calculated AQI values using EPA standards.
+> We use these values directly rather than recalculating, reducing complexity and ensuring accuracy.
 
 ---
 
@@ -155,6 +169,7 @@ class LocationAQIResponse(BaseModel):
     aqi: Optional[int] = None
     category: str
     color: str
+    pollutant_breakdown: Optional[dict] = None  # Individual pollutant AQIs
     # ... more fields
 ```
 
@@ -173,8 +188,8 @@ async def get_aqi_by_location(request: LocationAQIRequest):
     Finds the nearest monitoring station.
     """
     try:
-        # Call our AQICN client
-        data = await fetch_aqi_by_location(
+        # Call our AQICN client - it handles all the formatting
+        data = fetch_aqi_by_location(
             request.latitude, 
             request.longitude
         )
@@ -184,20 +199,18 @@ async def get_aqi_by_location(request: LocationAQIRequest):
             station_name=data.get("station_name", "Unknown"),
             aqi=data.get("aqi"),
             category=data.get("category", "Unknown"),
+            pollutant_breakdown=data.get("pollutant_breakdown"),
             # ... map all fields
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 ```
 
-> 💡 **Async/Await**: FastAPI supports async functions. When waiting for external APIs, 
-> the server can handle other requests instead of blocking.
-
 ---
 
 ### 2. AQICN Client (`aqicn_client.py`)
 
-This file handles all communication with the external AQICN API.
+This file handles all communication with the external AQICN API and formats the response.
 
 ```mermaid
 sequenceDiagram
@@ -209,38 +222,60 @@ sequenceDiagram
     Client->>Client: Build URL with API token
     Client->>API: GET /feed/geo:lat;lng/
     API-->>Client: JSON response
-    Client->>Client: Parse & transform data
-    Client->>Client: Add category & message
+    Client->>Client: Parse & extract data
+    Client->>Client: Format pollutants
+    Client->>Client: Get category & message
     Client-->>Main: Structured dict
 ```
 
 #### Key Function
 ```python
-async def fetch_aqi_by_location(latitude: float, longitude: float) -> dict:
+def fetch_aqi_by_location(latitude: float, longitude: float) -> dict:
     """
     Fetch AQI data for coordinates from AQICN API.
     
-    Args:
-        latitude: Latitude (-90 to 90)
-        longitude: Longitude (-180 to 180)
-    
-    Returns:
-        Dict with AQI data, category, measurements, etc.
+    Note: The AQICN API already provides AQI values directly,
+    so we use them as-is rather than recalculating.
     """
-    # Get API token from environment
-    token = os.getenv("AQICN_API_TOKEN")
+    client = get_aqicn_client()
+    data = client.get_aqi_by_coordinates(latitude, longitude)
     
-    # Build the API URL
-    url = f"https://api.waqi.info/feed/geo:{latitude};{longitude}/?token={token}"
+    # Get AQI directly from API - this is the primary value
+    aqi = data.get("aqi")
+    category, color = get_aqi_category(aqi) if aqi else ("Unknown", "#808080")
+    message = get_health_message(aqi) if aqi else "No data available"
     
-    # Make async HTTP request
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url)
-        data = response.json()
+    # Format pollutants for display
+    measurements = []
+    pollutant_aqis = {}
     
-    # Parse and return structured data
-    return _parse_feed_response(data)
+    for param, value in data.get("pollutants", {}).items():
+        measurements.append({
+            "parameter": param,
+            "display_name": POLLUTANT_NAMES.get(param, param.upper()),
+            "value": value,
+            "unit": POLLUTANT_UNITS.get(param, "AQI")
+        })
+        # Collect air quality pollutants
+        if param in ['pm25', 'pm10', 'o3', 'no2', 'so2', 'co']:
+            pollutant_aqis[POLLUTANT_NAMES.get(param)] = value
+    
+    return {
+        "station_id": data.get("station_id"),
+        "station_name": data.get("station_name"),
+        "aqi": aqi,  # Direct from API
+        "category": category,
+        "color": color,
+        "message": message,
+        "pollutant_breakdown": pollutant_aqis,
+        "measurements": measurements,
+        # ... more fields
+    }
 ```
+
+> 💡 **Why Use AQI Directly?** 
+> The AQICN API provides pre-calculated AQI values using EPA standards.
+> There's no need to recalculate - we use them directly for accuracy.
 
 > 💡 **httpx vs requests**: `httpx` is like `requests` but supports async. 
 > Same API: `httpx.get(url)` works just like `requests.get(url)`.
@@ -249,7 +284,7 @@ async def fetch_aqi_by_location(latitude: float, longitude: float) -> dict:
 
 ### 3. AQI Calculator (`aqi_calculator.py`)
 
-Pure Python logic - no web framework code here!
+This file contains pure Python logic for manual AQI calculations (when users input raw pollutant concentrations instead of using location lookup).
 
 ```mermaid
 graph LR
@@ -280,6 +315,9 @@ graph LR
     MAX --> CAT
     MAX --> DOM
 ```
+
+> 💡 **Note**: For location-based AQI lookups, we use the AQI values directly from the AQICN API.
+> This calculator is primarily for manual pollutant concentration input.
 
 #### The AQI Formula
 
@@ -358,7 +396,31 @@ def calculate_aqi(pollutants: dict, standard: AQIStandard = AQIStandard.EPA) -> 
 | POST | `/aqi/location` | Get AQI by coordinates | `{latitude, longitude}` |
 | GET | `/search?keyword=...` | Search stations | - |
 | GET | `/aqi/station/{id}` | Get AQI for station | - |
-| POST | `/calculate-aqi` | Calculate from raw data | `{pm25, pm10, ...}` |
+
+### Response Format for `/aqi/location`
+
+```json
+{
+  "station_id": 12345,
+  "station_name": "Delhi, India",
+  "aqi": 156,
+  "category": "Unhealthy",
+  "color": "#ff0000",
+  "message": "Some members of the general public may experience health effects...",
+  "pollutant_breakdown": {
+    "PM2.5": 156,
+    "PM10": 89,
+    "O3": 45
+  },
+  "dominant_pollutant": "PM2.5",
+  "measurements": [
+    {"parameter": "pm25", "display_name": "PM2.5", "value": 156, "unit": "AQI"},
+    {"parameter": "t", "display_name": "Temperature", "value": 28.5, "unit": "°C"}
+  ],
+  "forecast": {...},
+  "coordinates": {"latitude": 28.6, "longitude": 77.2}
+}
+```
 
 ### Try It Yourself!
 
@@ -402,14 +464,14 @@ Server starts at http://localhost:8000
 ```txt
 fastapi          # Web framework
 uvicorn          # ASGI server (runs FastAPI)
-httpx            # Async HTTP client (like requests)
+httpx            # HTTP client (like requests, async-capable)
 python-dotenv    # Load .env files
 pydantic         # Data validation
 ```
 
 > 💡 **ASGI vs WSGI**: 
 > - WSGI (Flask default): Synchronous, one request at a time
-> - ASGI (FastAPI/uvicorn): Async, handles many concurrent requests
+> - ASGI (FastAPI/uvicorn): Async-capable, handles concurrent requests
 
 ---
 
@@ -442,7 +504,7 @@ print(response.json())
 
 ## 📚 Next Steps
 
-1. **Read the code** - Start with `aqi_calculator.py` (pure Python)
+1. **Read the code** - Start with `aqicn_client.py` (data fetching & formatting)
 2. **Modify an endpoint** - Add a new field to the response
 3. **Add a new endpoint** - Try creating `/aqi/cities` that returns hardcoded cities
 4. **Explore the frontend** - See how it calls these endpoints → [frontend/README.md](../frontend/README.md)

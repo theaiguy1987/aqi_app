@@ -12,15 +12,16 @@ Welcome to the React frontend! This document explains React concepts, the projec
 frontend/
 ├── src/
 │   ├── main.jsx           ← Entry point (like if __name__ == "__main__")
-│   ├── App.jsx            ← Main component with routing
+│   ├── App.jsx            ← Main component with routing & context
 │   ├── index.css          ← Global styles (Tailwind CSS)
+│   ├── contexts/
+│   │   └── LocationContext.jsx ← Shared state for location & AQI
 │   ├── pages/
 │   │   ├── Calculator.jsx ← Main AQI calculator page
 │   │   └── Blog.jsx       ← Blog page
 │   └── components/
-│       ├── Navigation.jsx ← Top nav bar
-│       ├── AQIForm.jsx    ← Location input form
-│       └── AQIResult.jsx  ← AQI result display
+│       ├── Navigation.jsx ← Top nav bar with location search
+│       └── AQIResult.jsx  ← AQI result display with cigarette equivalent
 ├── index.html             ← HTML template
 ├── package.json           ← Dependencies (like requirements.txt)
 ├── vite.config.js         ← Build tool config
@@ -40,6 +41,7 @@ graph TB
     
     subgraph "App Shell"
         APP[App.jsx]
+        CTX[LocationContext Provider]
         NAV[Navigation.jsx]
         ROUTER[React Router]
     end
@@ -50,21 +52,23 @@ graph TB
     end
     
     subgraph "Components"
-        FORM[AQIForm.jsx]
         RESULT[AQIResult.jsx]
     end
     
     HTML --> MAIN
     MAIN --> APP
-    APP --> NAV
-    APP --> ROUTER
+    APP --> CTX
+    CTX --> NAV
+    CTX --> ROUTER
     ROUTER --> CALC
     ROUTER --> BLOG
-    CALC --> FORM
     CALC --> RESULT
+    NAV -->|setSelectedLocation| CTX
+    CTX -->|aqiData| CALC
     
+    style CTX fill:#a855f7
     style CALC fill:#61dafb
-    style FORM fill:#90caf9
+    style NAV fill:#90caf9
     style RESULT fill:#90caf9
 ```
 
@@ -72,12 +76,60 @@ graph TB
 
 ```
 App
-├── Navigation (always visible)
-└── Routes
-    ├── "/" → Calculator
-    │         ├── AQIForm (location input)
-    │         └── AQIResult (results display)
-    └── "/blog" → Blog
+├── LocationContext Provider (shared state)
+│   ├── Navigation (location search bar - always visible)
+│   └── Routes
+│       ├── "/" → Calculator
+│       │         └── AQIResult (results display)
+│       └── "/blog" → Blog
+```
+
+---
+
+## 🔄 State Management with Context
+
+The app uses React Context to share location and AQI data across all components:
+
+```mermaid
+flowchart TB
+    subgraph LocationContext
+        direction TB
+        STATE[State]
+        STATE --> SL[selectedLocation]
+        STATE --> AD[aqiData]
+        STATE --> LD[loading]
+        STATE --> ER[error]
+        
+        ACTIONS[Actions]
+        ACTIONS --> GL[getCurrentLocation]
+        ACTIONS --> SLC[setSelectedLocation]
+        ACTIONS --> FA[fetchAQI]
+    end
+    
+    NAV[Navigation] -->|reads & writes| LocationContext
+    CALC[Calculator] -->|reads| LocationContext
+    
+    style LocationContext fill:#a855f7,color:#fff
+```
+
+### Why Context?
+
+Without Context, you'd have to pass data through every component:
+```jsx
+// Without Context (prop drilling - messy!)
+<App>
+  <Navigation onLocationChange={handleChange} selectedLocation={location} />
+  <Calculator aqiData={data} loading={loading} error={error} />
+</App>
+```
+
+With Context, any component can access the shared state:
+```jsx
+// With Context (clean!)
+<LocationProvider>  {/* Provides state to all children */}
+  <Navigation />    {/* Uses useLocation() hook */}
+  <Calculator />    {/* Uses useLocation() hook */}
+</LocationProvider>
 ```
 
 ---
@@ -158,7 +210,48 @@ graph LR
     D --> E[New count displayed]
 ```
 
-### 4. JSX = HTML Inside JavaScript
+### 4. Context = Shared Global State
+
+```jsx
+// Create context (like a global state container)
+const LocationContext = createContext()
+
+// Provider wraps app and provides state
+function LocationProvider({ children }) {
+    const [aqiData, setAqiData] = useState(null)
+    
+    return (
+        <LocationContext.Provider value={{ aqiData, setAqiData }}>
+            {children}
+        </LocationContext.Provider>
+    )
+}
+
+// Any child component can use the context
+function Calculator() {
+    const { aqiData } = useContext(LocationContext)
+    return <div>AQI: {aqiData?.aqi}</div>
+}
+```
+
+**Python equivalent (conceptually):**
+```python
+# Like a singleton/global object
+class LocationContext:
+    _instance = None
+    
+    def __new__(cls):
+        if not cls._instance:
+            cls._instance = super().__new__(cls)
+            cls._instance.aqi_data = None
+        return cls._instance
+
+# Any module can access it
+ctx = LocationContext()
+print(ctx.aqi_data)
+```
+
+### 5. JSX = HTML Inside JavaScript
 
 JSX looks like HTML but it's JavaScript:
 
@@ -186,7 +279,7 @@ f"""
 """
 ```
 
-### 5. useEffect = Run Code When Component Loads
+### 6. useEffect = Run Code When Component Loads
 
 ```jsx
 function UserProfile({ userId }) {
@@ -246,21 +339,24 @@ if __name__ == "__main__":
 
 ```jsx
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { LocationProvider } from './contexts/LocationContext'
 import Navigation from './components/Navigation'
 import Calculator from './pages/Calculator'
 import Blog from './pages/Blog'
 
 function App() {
   return (
-    <Router>
-      <div className="min-h-screen">
-        <Navigation />           {/* Always visible */}
-        <Routes>
-          <Route path="/" element={<Calculator />} />
-          <Route path="/blog" element={<Blog />} />
-        </Routes>
-      </div>
-    </Router>
+    <LocationProvider>        {/* Shared state for all components */}
+      <Router>
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+          <Navigation />      {/* Location search always visible */}
+          <Routes>
+            <Route path="/" element={<Calculator />} />
+            <Route path="/blog" element={<Blog />} />
+          </Routes>
+        </div>
+      </Router>
+    </LocationProvider>
   )
 }
 
@@ -268,180 +364,249 @@ export default App
 ```
 
 **What this does:**
+- Wraps entire app in `<LocationProvider>` for shared state
 - Wraps app in `<Router>` for navigation
-- Shows `<Navigation>` on every page
+- Shows `<Navigation>` (with search) on every page
 - Shows `<Calculator>` when URL is `/`
 - Shows `<Blog>` when URL is `/blog`
 
-**Python Flask equivalent:**
-```python
-@app.route("/")
-def calculator():
-    return render_template("calculator.html")
+### Location Context: `contexts/LocationContext.jsx`
 
-@app.route("/blog")
-def blog():
-    return render_template("blog.html")
-```
-
-### Main Page: `Calculator.jsx`
-
-This is where the magic happens!
+This is the "brain" of the app - it manages all location and AQI state:
 
 ```jsx
-import { useState } from 'react'
-import AQIForm from '../components/AQIForm'
-import AQIResult from '../components/AQIResult'
+function LocationProvider({ children }) {
+  // Location state
+  const [selectedLocation, setSelectedLocation] = useState(null)
+  const [locationInput, setLocationInput] = useState('')
+  
+  // AQI data state  
+  const [aqiData, setAqiData] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-
-export default function Calculator() {
-  // State variables
-  const [aqiData, setAqiData] = useState(null)    // API response
-  const [loading, setLoading] = useState(false)    // Loading spinner
-  const [error, setError] = useState(null)         // Error message
-
-  // Function called when form is submitted
-  const handleCalculateAQI = async (formData) => {
-    setLoading(true)
-    setError(null)
-    
-    try {
-      // Make API call (like requests.post in Python)
-      const response = await fetch(`${API_URL}/aqi/location`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          latitude: formData.latitude,
-          longitude: formData.longitude
-        }),
-      })
-      
-      const data = await response.json()
-      setAqiData(data)  // Update state → triggers re-render
-      
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
+  // Auto-request location on first load
+  useEffect(() => {
+    const hasAskedPermission = sessionStorage.getItem('locationPermissionAsked')
+    if (!hasAskedPermission && navigator.geolocation) {
+      sessionStorage.setItem('locationPermissionAsked', 'true')
+      getCurrentLocation()  // Automatically ask for location!
     }
+  }, [])
+
+  // Fetch AQI when location is set
+  const fetchAQI = async (latitude, longitude) => {
+    setLoading(true)
+    const response = await fetch(`${API_URL}/aqi/location`, {
+      method: 'POST',
+      body: JSON.stringify({ latitude, longitude }),
+    })
+    const data = await response.json()
+    setAqiData(data)
+    setLoading(false)
   }
 
-  // Render the UI
+  // Provide state to all children
   return (
-    <div className="container">
-      <h1>Air Quality Index</h1>
-      
-      {/* Form component - calls handleCalculateAQI on submit */}
-      <AQIForm onSubmit={handleCalculateAQI} loading={loading} />
-      
-      {/* Conditional rendering */}
-      {loading && <p>Loading...</p>}
-      {error && <p className="error">{error}</p>}
-      {aqiData && <AQIResult data={aqiData} />}
-    </div>
+    <LocationContext.Provider value={{ 
+      selectedLocation, setSelectedLocation,
+      aqiData, loading, error,
+      getCurrentLocation, fetchAQI 
+    }}>
+      {children}
+    </LocationContext.Provider>
   )
 }
 ```
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Idle: Page loads
-    Idle --> Loading: User clicks "Get AQI"
-    Loading --> Success: API returns data
-    Loading --> Error: API fails
-    Success --> Idle: User searches again
-    Error --> Idle: User tries again
+    [*] --> PageLoad: User visits site
+    PageLoad --> AskingPermission: Auto-request location
+    AskingPermission --> Granted: User allows
+    AskingPermission --> Denied: User denies
+    Granted --> Loading: Fetch AQI data
+    Denied --> WaitingForSearch: Show search bar
+    WaitingForSearch --> Loading: User searches location
+    Loading --> ShowResult: Data received
+    ShowResult --> Loading: User changes location
     
-    note right of Idle: aqiData = null
-    note right of Loading: loading = true
-    note right of Success: aqiData = {...}
-    note right of Error: error = "message"
+    note right of Granted: GPS coordinates obtained
+    note right of Loading: aqiData being fetched
+    note right of ShowResult: Display AQI card
 ```
 
-### Form Component: `AQIForm.jsx`
+### Navigation Component: `components/Navigation.jsx`
 
-Handles location input with Google Places autocomplete:
+The navigation bar contains the location search - always accessible:
 
 ```jsx
-function AQIForm({ onSubmit, loading }) {
-  const [locationInput, setLocationInput] = useState('')
-  const [selectedLocation, setSelectedLocation] = useState(null)
+function Navigation() {
+  const { 
+    selectedLocation, 
+    setSelectedLocation, 
+    locationInput, 
+    setLocationInput,
+    getCurrentLocation,
+    loading 
+  } = useLocation()  // Get state from context
   
-  const handleSubmit = (e) => {
-    e.preventDefault()  // Prevent page reload
+  // Google Places autocomplete for search
+  const handleSelectPrediction = async (prediction) => {
+    const place = new window.google.maps.places.Place({ id: prediction.placeId })
+    await place.fetchFields({ fields: ['location'] })
     
-    // Call parent's function with location data
-    onSubmit({
-      latitude: selectedLocation.latitude,
-      longitude: selectedLocation.longitude
+    // This triggers AQI fetch via context
+    setSelectedLocation({
+      name: prediction.description,
+      latitude: place.location.lat(),
+      longitude: place.location.lng()
     })
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <input
-        type="text"
+    <nav className="...">
+      {/* Logo */}
+      <Link to="/">AirQuality</Link>
+      
+      {/* Search bar */}
+      <input 
         value={locationInput}
         onChange={(e) => setLocationInput(e.target.value)}
-        placeholder="Enter a location..."
+        placeholder="Search location..."
       />
-      <button type="submit" disabled={loading}>
-        {loading ? 'Loading...' : 'Get AQI'}
+      
+      {/* My Location button */}
+      <button onClick={getCurrentLocation}>
+        Use My Location
       </button>
-    </form>
+      
+      {/* Selected location indicator */}
+      {selectedLocation && (
+        <span>{selectedLocation.name}</span>
+      )}
+    </nav>
   )
 }
 ```
 
-**Key patterns:**
-- `onSubmit` prop = callback function from parent
-- `e.preventDefault()` = stop form from reloading page
-- `onChange` = update state on every keystroke
-- `disabled={loading}` = disable button while loading
+### Calculator Page: `pages/Calculator.jsx`
 
-### Result Component: `AQIResult.jsx`
-
-Displays the AQI data with colors and categories:
+The main page - now much simpler because state is in context:
 
 ```jsx
-function AQIResult({ data }) {
-  const { aqi, category, color, location, measurements } = data
-  
-  // Helper function to determine gradient color
-  const getAQIGradient = (aqi) => {
-    if (aqi <= 50) return 'from-green-400 to-green-600'
-    if (aqi <= 100) return 'from-yellow-400 to-yellow-600'
-    if (aqi <= 150) return 'from-orange-400 to-orange-600'
-    return 'from-red-400 to-red-600'
-  }
+function Calculator() {
+  const { aqiData, loading, error, locationPermission } = useLocation()
 
   return (
-    <div className={`bg-gradient-to-r ${getAQIGradient(aqi)}`}>
-      <h2>{aqi}</h2>
-      <p>{category}</p>
-      <p>{location}</p>
-      
-      {/* Map over array (like Python list comprehension) */}
-      <div>
-        {measurements.map((m, index) => (
-          <div key={index}>
-            {m.display_name}: {m.value}
-          </div>
-        ))}
-      </div>
+    <div className="min-h-screen">
+      {/* Show hero when no data */}
+      {!aqiData && !loading && !error && (
+        <div className="text-center">
+          <h1>Check Your Air Quality</h1>
+          {locationPermission === 'denied' && (
+            <p>Location denied. Use search bar above.</p>
+          )}
+        </div>
+      )}
+
+      {/* Loading state */}
+      {loading && <LoadingSpinner />}
+
+      {/* Error state */}
+      {error && <ErrorMessage message={error} />}
+
+      {/* Results */}
+      {aqiData && !loading && <AQIResult data={aqiData} />}
     </div>
   )
 }
 ```
 
-**Array mapping (like Python list comprehension):**
-```jsx
-// React
-{items.map(item => <div key={item.id}>{item.name}</div>)}
+### Result Component: `components/AQIResult.jsx`
 
-// Python equivalent
-[f"<div>{item['name']}</div>" for item in items]
+Displays the AQI data with the new design:
+
+```jsx
+function AQIResult({ data }) {
+  const { aqi, category, location, message, pollutant_breakdown } = data
+
+  // Calculate cigarette equivalent (22 µg/m³ PM2.5 ≈ 1 cigarette)
+  const cigarettes = getCigaretteEquivalent(aqi)
+
+  return (
+    <div className="space-y-6">
+      {/* Main AQI Card */}
+      <div className="bg-white rounded-3xl shadow-xl">
+        {/* Big AQI number with color */}
+        <div className={`bg-gradient-to-br ${getAQIGradient(aqi)} p-10`}>
+          <p className="text-9xl font-black">{aqi}</p>
+          <p className="text-xl">{category}</p>
+        </div>
+
+        {/* Station info */}
+        <div className="p-4 bg-gray-50 rounded-xl">
+          <p>Nearest Station</p>
+          <p className="font-semibold">{location}</p>
+        </div>
+
+        {/* Cigarette equivalent */}
+        <div className="p-5 rounded-2xl">
+          <p>🚬 Equivalent: {cigarettes} cigarettes/day</p>
+        </div>
+
+        {/* Health advice */}
+        <div className="p-5 bg-amber-50 rounded-xl">
+          <p>⚠️ {message}</p>
+        </div>
+      </div>
+
+      {/* Pollutant breakdown */}
+      {pollutant_breakdown && (
+        <div className="grid grid-cols-3 gap-3">
+          {Object.entries(pollutant_breakdown).map(([name, value]) => (
+            <div key={name} className="p-4 rounded-xl text-center">
+              <p>{name}</p>
+              <p className="text-2xl font-bold">{value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+```
+
+---
+
+## 🔄 Data Flow Summary
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Navigation
+    participant LocationContext
+    participant Calculator
+    participant Backend
+
+    Note over User,Navigation: Page loads
+    Navigation->>LocationContext: Check for stored permission
+    LocationContext->>LocationContext: Auto-request geolocation
+    User-->>LocationContext: Grants permission
+    LocationContext->>Backend: POST /aqi/location {lat, lng}
+    Backend-->>LocationContext: AQI data
+    LocationContext->>Calculator: Update aqiData state
+    Calculator->>User: Show AQI result
+
+    Note over User,Navigation: Or user searches
+    User->>Navigation: Types "Delhi"
+    Navigation->>Navigation: Google Places autocomplete
+    User->>Navigation: Selects location
+    Navigation->>LocationContext: setSelectedLocation({lat, lng})
+    LocationContext->>Backend: POST /aqi/location
+    Backend-->>LocationContext: AQI data
+    LocationContext->>Calculator: Update state
+    Calculator->>User: Show result
 ```
 
 ---
@@ -468,9 +633,10 @@ This project uses Tailwind CSS - utility classes instead of writing CSS:
 | `p-4` | Padding all sides |
 | `px-4` | Padding left & right |
 | `py-2` | Padding top & bottom |
-| `rounded` | Rounded corners |
+| `rounded-xl` | Rounded corners |
 | `flex` | Flexbox container |
-| `grid` | Grid container |
+| `grid grid-cols-3` | 3-column grid |
+| `shadow-xl` | Large shadow |
 | `hover:bg-blue-600` | Blue on hover |
 
 ---
@@ -513,36 +679,12 @@ VITE_GOOGLE_MAPS_API_KEY=your_key_here  # Optional
 
 ---
 
-## 🔄 Data Flow Summary
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant AQIForm
-    participant Calculator
-    participant Backend
-    participant AQIResult
-
-    User->>AQIForm: Types location
-    AQIForm->>AQIForm: Updates locationInput state
-    User->>AQIForm: Clicks "Get AQI"
-    AQIForm->>Calculator: onSubmit(location)
-    Calculator->>Calculator: setLoading(true)
-    Calculator->>Backend: fetch('/aqi/location')
-    Backend-->>Calculator: JSON response
-    Calculator->>Calculator: setAqiData(data)
-    Calculator->>AQIResult: Renders with data prop
-    AQIResult-->>User: Displays colored AQI card
-```
-
----
-
 ## 🧪 Try These Exercises
 
 1. **Change a color**: In `AQIResult.jsx`, modify the gradient colors
 2. **Add a field**: Display a new field from the API response
 3. **Create a component**: Make a `<Spinner />` component for loading states
-4. **Add a page**: Create a new route `/about` with an About page
+4. **Modify the context**: Add a new piece of state (e.g., `favoriteLocations`)
 
 ---
 
@@ -567,3 +709,6 @@ A: `class` is a reserved word in JavaScript. React uses `className` for CSS clas
 
 **Q: What's the `key` prop in lists?**  
 A: React needs unique keys to track list items efficiently. Always use a unique identifier.
+
+**Q: Why use Context instead of props?**  
+A: Context avoids "prop drilling" - passing data through many component layers. It's like having a global variable that components can subscribe to.

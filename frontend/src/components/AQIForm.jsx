@@ -23,32 +23,47 @@ function AQIForm({ onSubmit, loading }) {
 
   // Load Google Maps Places library (New API)
   useEffect(() => {
+    // DIAGNOSTIC: Log API key status
+    console.log('🔍 DIAGNOSTIC - Google Maps API Key Check:')
+    console.log('  - Key exists:', !!GOOGLE_MAPS_API_KEY)
+    console.log('  - Key length:', GOOGLE_MAPS_API_KEY?.length || 0)
+    console.log('  - Key preview:', GOOGLE_MAPS_API_KEY ? `${GOOGLE_MAPS_API_KEY.substring(0, 10)}...` : 'NOT SET')
+    
     if (!GOOGLE_MAPS_API_KEY) {
-      console.warn('Google Maps API key not configured. Autocomplete will be disabled.')
+      console.warn('⚠️ Google Maps API key not configured. Autocomplete will be disabled.')
+      console.warn('   Check your .env file has: VITE_GOOGLE_MAPS_API_KEY=your_key_here')
       return
     }
 
     // Check if script already loaded
     if (window.google && window.google.maps && window.google.maps.places) {
       setPlacesReady(true)
-      console.log('Google Maps Places API ready (already loaded)')
+      console.log('✅ Google Maps Places API ready (already loaded)')
       return
     }
 
     // Load script with the new Places API
+    const scriptUrl = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`
+    console.log('📡 Loading Google Maps script:', scriptUrl.replace(GOOGLE_MAPS_API_KEY, 'API_KEY_HIDDEN'))
+    
     const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`
+    script.src = scriptUrl
     script.async = true
     script.onload = () => {
       if (window.google && window.google.maps && window.google.maps.places) {
         setPlacesReady(true)
-        console.log('Google Maps Places API loaded successfully')
+        console.log('✅ Google Maps Places API loaded successfully')
       } else {
-        console.error('Google Maps loaded but Places API not available')
+        console.error('❌ Google Maps loaded but Places API not available')
       }
     }
     script.onerror = (error) => {
-      console.error('Failed to load Google Maps API:', error)
+      console.error('❌ Failed to load Google Maps API:', error)
+      console.error('   This could mean:')
+      console.error('   1. API key is invalid or expired')
+      console.error('   2. API key has domain restrictions')
+      console.error('   3. Places API (New) is not enabled')
+      console.error('   4. Network connectivity issue')
     }
     document.head.appendChild(script)
 
@@ -92,6 +107,8 @@ function AQIForm({ onSubmit, loading }) {
     // Debounce the API call
     debounceTimerRef.current = setTimeout(async () => {
       try {
+        console.log('🔍 Fetching autocomplete for:', locationInput)
+        
         // Use the new AutocompleteSuggestion API
         // No type restriction - allows any location: cities, landmarks, addresses, parks, etc.
         const { suggestions } = await window.google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
@@ -104,6 +121,8 @@ function AQIForm({ onSubmit, loading }) {
           // - Businesses, schools, hospitals
           // - ANY geocodable location
         })
+
+        console.log('✅ Received', suggestions?.length || 0, 'suggestions')
 
         if (suggestions && suggestions.length > 0) {
           const formattedPredictions = suggestions.slice(0, 5).map(suggestion => ({
@@ -119,7 +138,15 @@ function AQIForm({ onSubmit, loading }) {
         }
         setIsLoadingPredictions(false)
       } catch (err) {
-        console.error('Places API error:', err)
+        console.error('❌ Places API error:', err)
+        console.error('   Error details:', err.message || err)
+        if (err.message?.includes('ApiNotActivatedMapError')) {
+          console.error('   → Places API (New) is not enabled for this API key')
+        } else if (err.message?.includes('RefererNotAllowedMapError')) {
+          console.error('   → API key has domain restrictions. Add http://localhost:3000 to allowed referrers')
+        } else if (err.message?.includes('InvalidKeyMapError')) {
+          console.error('   → API key is invalid or expired')
+        }
         setPredictions([])
         setIsLoadingPredictions(false)
       }
