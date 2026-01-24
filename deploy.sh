@@ -41,9 +41,9 @@ gcloud builds submit --tag gcr.io/$PROJECT_ID/$BACKEND_SERVICE
 
 # Check if AQICN_API_TOKEN is set
 if [ -z "$AQICN_API_TOKEN" ]; then
-    echo "WARNING: AQICN_API_TOKEN environment variable not set."
-    echo "Set it with: export AQICN_API_TOKEN=your_api_token_here"
-    echo "Get a free token at: https://aqicn.org/data-platform/token/"
+    echo "INFO: AQICN_API_TOKEN not set in shell."
+    echo "      If already configured in Secret Manager, this is fine."
+    echo "      Otherwise, set it with: export AQICN_API_TOKEN=your_token"
     echo ""
 fi
 
@@ -69,19 +69,20 @@ echo "=========================================="
 
 # Check if GOOGLE_MAPS_API_KEY is set for location autocomplete
 if [ -z "$GOOGLE_MAPS_API_KEY" ]; then
-    echo "WARNING: GOOGLE_MAPS_API_KEY environment variable not set."
-    echo "Location autocomplete will not work without it."
-    echo "Set it with: export GOOGLE_MAPS_API_KEY=your_api_key_here"
+    echo "WARNING: GOOGLE_MAPS_API_KEY not set - location search will NOT work!"
+    echo "         Set it with: export GOOGLE_MAPS_API_KEY=your_api_key"
+    echo "         Get one at: https://console.cloud.google.com/apis/credentials"
     echo ""
 fi
 
-# Create .env.production for frontend build
-echo "VITE_API_URL=$BACKEND_URL" > frontend/.env.production
-echo "VITE_GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY" >> frontend/.env.production
-
-# Build frontend image (Dockerfile will copy .env.production and use it during npm run build)
+# Build frontend image with build args for Vite environment variables
+# Note: We pass build args directly to Docker instead of using .env files
+# because gcloud builds submit runs in the cloud, not locally
 cd frontend
-gcloud builds submit --tag gcr.io/$PROJECT_ID/$FRONTEND_SERVICE
+gcloud builds submit \
+    --tag gcr.io/$PROJECT_ID/$FRONTEND_SERVICE \
+    --build-arg VITE_API_URL=$BACKEND_URL \
+    --build-arg VITE_GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY
 
 # Deploy frontend to Cloud Run
 gcloud run deploy $FRONTEND_SERVICE \

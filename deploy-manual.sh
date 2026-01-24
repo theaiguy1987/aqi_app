@@ -59,10 +59,21 @@ read
 echo ""
 echo "Step 4: Build Frontend Docker Image"
 echo "------------------------------------"
-echo "The frontend needs to know the backend URL."
-echo "Building with VITE_API_URL=$BACKEND_URL"
+echo "The frontend needs to know the backend URL and Google Maps API key."
+if [ -z "$GOOGLE_MAPS_API_KEY" ]; then
+    echo "WARNING: GOOGLE_MAPS_API_KEY not set - location autocomplete will NOT work!"
+    echo "         Set it with: export GOOGLE_MAPS_API_KEY=your_api_key"
+    echo "         Get one at: https://console.cloud.google.com/apis/credentials"
+    echo ""
+fi
+echo "Building with:"
+echo "  VITE_API_URL=$BACKEND_URL"
+echo "  VITE_GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:+[SET]}"
 cd frontend
-docker build --build-arg VITE_API_URL=$BACKEND_URL -t gcr.io/$PROJECT_ID/aqi-frontend .
+docker build \
+    --build-arg VITE_API_URL=$BACKEND_URL \
+    --build-arg VITE_GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY \
+    -t gcr.io/$PROJECT_ID/aqi-frontend .
 docker push gcr.io/$PROJECT_ID/aqi-frontend
 cd ..
 echo "✓ Frontend image built and pushed"

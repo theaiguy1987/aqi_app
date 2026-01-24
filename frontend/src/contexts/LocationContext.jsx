@@ -91,13 +91,23 @@ export function LocationProvider({ children }) {
 
   // Handle getting current location
   const getCurrentLocation = useCallback(() => {
+    // Check if we're in a secure context (required for geolocation on mobile)
+    if (window.isSecureContext === false) {
+      setLocationError('Location requires HTTPS. Please use a secure connection.')
+      return
+    }
+
     if (!navigator.geolocation) {
-      setLocationError('Geolocation is not supported by your browser')
+      setLocationError('Geolocation is not supported by your browser. Please enter your location manually.')
       return
     }
 
     setGettingLocation(true)
     setLocationError(null)
+
+    // Use a longer timeout for mobile devices which can be slower
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    const timeout = isMobile ? 15000 : 10000
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -118,24 +128,25 @@ export function LocationProvider({ children }) {
       (error) => {
         setGettingLocation(false)
         setLocationPermission('denied')
+        console.error('Geolocation error:', error.code, error.message)
         switch (error.code) {
           case error.PERMISSION_DENIED:
-            setLocationError('Location access denied. Please enter your location manually.')
+            setLocationError('Location access denied. Please enable location in your browser/device settings, or enter your location manually.')
             break
           case error.POSITION_UNAVAILABLE:
-            setLocationError('Location information is unavailable.')
+            setLocationError('Unable to determine your location. Please ensure GPS is enabled or enter your location manually.')
             break
           case error.TIMEOUT:
-            setLocationError('Location request timed out.')
+            setLocationError('Location request timed out. Please try again or enter your location manually.')
             break
           default:
-            setLocationError('An error occurred while getting your location.')
+            setLocationError('Unable to get your location. Please enter your location manually.')
         }
       },
       {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
+        enableHighAccuracy: isMobile, // High accuracy for mobile, standard for desktop
+        timeout: timeout,
+        maximumAge: 60000 // Accept cached position up to 1 minute old
       }
     )
   }, [fetchAQI])
