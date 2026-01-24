@@ -75,14 +75,21 @@ if [ -z "$GOOGLE_MAPS_API_KEY" ]; then
     echo ""
 fi
 
-# Build frontend image with build args for Vite environment variables
-# Note: We pass build args directly to Docker instead of using .env files
-# because gcloud builds submit runs in the cloud, not locally
+# Create .env file in frontend directory before building
+# This file will be included in the build context uploaded to Cloud Build
+# The Dockerfile's npm run build will use these environment variables
 cd frontend
-gcloud builds submit \
-    --tag gcr.io/$PROJECT_ID/$FRONTEND_SERVICE \
-    --build-arg VITE_API_URL=$BACKEND_URL \
-    --build-arg VITE_GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY
+cat > .env << EOF
+VITE_API_URL=$BACKEND_URL
+VITE_GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY
+EOF
+echo "Created .env with VITE_API_URL=$BACKEND_URL"
+
+# Build frontend image - the .env file is included in the build context
+gcloud builds submit --tag gcr.io/$PROJECT_ID/$FRONTEND_SERVICE
+
+# Clean up .env file after build
+rm -f .env
 
 # Deploy frontend to Cloud Run
 gcloud run deploy $FRONTEND_SERVICE \
