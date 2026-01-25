@@ -68,6 +68,8 @@ export function LocationProvider({ children }) {
         measurement_time: data.measurement_time,
         forecast: data.forecast,
         coordinates: data.coordinates,
+        user_coordinates: data.user_coordinates,
+        distance_km: data.distance_km,
         attributions: data.attributions,
         aqi_standard: data.aqi_standard,
         pollutant_breakdown: data.pollutant_breakdown

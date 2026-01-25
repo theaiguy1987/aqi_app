@@ -19,6 +19,28 @@ import os
 
 from aqicn_client import fetch_aqi_by_location, get_aqicn_client
 from aqi_calculator import calculate_aqi, generate_sample_pollutant_data
+import math
+
+
+def calculate_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """
+    Calculate the distance between two points using Haversine formula.
+    Returns distance in kilometers.
+    """
+    if None in (lat1, lon1, lat2, lon2):
+        return None
+    
+    R = 6371  # Earth's radius in kilometers
+    
+    lat1_rad = math.radians(lat1)
+    lat2_rad = math.radians(lat2)
+    delta_lat = math.radians(lat2 - lat1)
+    delta_lon = math.radians(lon2 - lon1)
+    
+    a = math.sin(delta_lat/2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lon/2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    
+    return round(R * c, 2)
 
 app = FastAPI(
     title="AQI Calculator API",
@@ -73,7 +95,9 @@ class LocationAQIResponse(BaseModel):
     station_id: Optional[int] = None
     station_name: str
     station_url: Optional[str] = None
-    coordinates: dict
+    coordinates: dict  # Station coordinates
+    user_coordinates: Optional[dict] = None  # User's requested coordinates
+    distance_km: Optional[float] = None  # Distance from user to station in km
     aqi: Optional[int] = None
     category: str
     color: str
@@ -166,11 +190,22 @@ async def get_aqi_by_location(request: LocationAQIRequest):
             for m in data.get("measurements", [])
         ]
         
+        # Calculate distance from user to station
+        station_coords = data.get("coordinates", {})
+        distance_km = calculate_distance_km(
+            request.latitude, 
+            request.longitude,
+            station_coords.get("latitude"),
+            station_coords.get("longitude")
+        )
+        
         return LocationAQIResponse(
             station_id=data.get("station_id"),
             station_name=data.get("station_name", "Unknown"),
             station_url=data.get("station_url"),
-            coordinates=data.get("coordinates", {}),
+            coordinates=station_coords,
+            user_coordinates={"latitude": request.latitude, "longitude": request.longitude},
+            distance_km=distance_km,
             aqi=data.get("aqi"),
             category=data.get("category", "Unknown"),
             color=data.get("color", "#808080"),
