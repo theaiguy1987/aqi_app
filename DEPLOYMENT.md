@@ -245,9 +245,9 @@ Frontend calls Backend /aqi/location endpoint with coordinates
     ↓
 Backend fetches live data from AQICN API
     ↓
-Backend calculates Indian NAQI from EPA values
+Backend returns EPA AQI values with health recommendations
     ↓
-Result displayed with NAQI and EPA comparison
+Result displayed with color-coded AQI and cigarette equivalent
 ```
 
 That's why `deploy.sh`:

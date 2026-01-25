@@ -63,10 +63,7 @@ cd aqi_app
 ### Step 2: Backend Setup
 
 ```bash
-# Navigate to backend
-cd backend
-
-# Create Python virtual environment
+# Create Python virtual environment at project root
 python -m venv .venv
 
 # Activate virtual environment
@@ -75,7 +72,8 @@ python -m venv .venv
 # Linux/Mac:
 source .venv/bin/activate
 
-# Install Python dependencies
+# Navigate to backend and install dependencies
+cd backend
 pip install -r requirements.txt
 
 # Create environment file
@@ -103,7 +101,7 @@ You need **two terminal windows**:
 **Terminal 1 - Backend:**
 ```bash
 cd backend
-.venv\Scripts\activate    # or: source .venv/bin/activate
+../.venv/Scripts/activate    # or: source ../.venv/bin/activate
 python main.py
 ```
 ✅ Backend runs at http://localhost:8000
@@ -216,3 +214,4 @@ You're all set! Open http://localhost:3000 and start checking air quality around
 **Next Steps:**
 - Read [backend/README.md](backend/README.md) to understand the Python code
 - Read [frontend/README.md](frontend/README.md) to understand the React code
+- See [DEPLOYMENT.md](DEPLOYMENT.md) for deploying to Google Cloud Run

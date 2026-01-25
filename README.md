@@ -79,22 +79,33 @@ Think of this application like a restaurant:
 ```
 aqi_app/
 ├── backend/                 ← Python code (start here!)
-│   ├── main.py              ← API server entry point
-│   ├── aqi_calculator.py    ← AQI calculation logic
-│   ├── aqicn_client.py      ← Fetches data from AQICN
+│   ├── main.py              ← API server entry point (FastAPI)
+│   ├── aqi_calculator.py    ← AQI calculation logic (EPA formula)
+│   ├── aqicn_client.py      ← Fetches data from AQICN API
 │   ├── requirements.txt     ← Python dependencies
+│   ├── Dockerfile           ← Container config for deployment
 │   └── README.md            ← Backend documentation
 │
 ├── frontend/                ← React code
 │   ├── src/
-│   │   ├── App.jsx          ← Main app with routing
-│   │   ├── contexts/        ← Shared state (LocationContext)
-│   │   ├── pages/           ← Full page components
-│   │   └── components/      ← Reusable UI pieces
+│   │   ├── main.jsx         ← Entry point (renders App)
+│   │   ├── App.jsx          ← Main app with routing & context
+│   │   ├── index.css        ← Global styles (Tailwind CSS)
+│   │   ├── contexts/
+│   │   │   └── LocationContext.jsx ← Shared state for location & AQI
+│   │   ├── pages/
+│   │   │   ├── Calculator.jsx ← Main AQI calculator page
+│   │   │   └── Blog.jsx       ← Blog page
+│   │   └── components/
+│   │       ├── Navigation.jsx ← Top nav bar with location search
+│   │       ├── AQIResult.jsx  ← AQI result display
+│   │       └── AQIForm.jsx    ← Manual AQI input form
 │   ├── package.json         ← Node.js dependencies
+│   ├── Dockerfile           ← Container config for deployment
 │   └── README.md            ← Frontend documentation
 │
 ├── LOCAL_SETUP.md           ← How to run locally
+├── DEPLOYMENT.md            ← Google Cloud Run deployment guide
 ├── start.bat / start.sh     ← One-click startup scripts
 └── README.md                ← This file
 ```
@@ -329,11 +340,13 @@ In JSX (React's HTML-like syntax), curly braces `{}` mean "execute this JavaScri
 | File | Why It's Important | Difficulty |
 |------|-------------------|------------|
 | `backend/main.py` | API endpoints - you know this! | ⭐ Easy |
-| `backend/aqicn_client.py` | Fetches and formats AQI data | ⭐ Easy |
-| `frontend/src/contexts/LocationContext.jsx` | Shared state management | ⭐⭐ Medium |
-| `frontend/src/components/Navigation.jsx` | Location search in header | ⭐⭐ Medium |
+| `backend/aqicn_client.py` | Fetches and formats AQI data from AQICN | ⭐ Easy |
+| `backend/aqi_calculator.py` | EPA AQI calculation formula | ⭐ Easy |
+| `frontend/src/contexts/LocationContext.jsx` | Shared state management & AQI fetching | ⭐⭐ Medium |
+| `frontend/src/components/Navigation.jsx` | Location search with Google Places | ⭐⭐ Medium |
 | `frontend/src/pages/Calculator.jsx` | Main page using context | ⭐⭐ Medium |
 | `frontend/src/components/AQIResult.jsx` | UI component with cigarette equivalent | ⭐⭐ Medium |
+| `frontend/src/components/AQIForm.jsx` | Manual AQI input form | ⭐⭐ Medium |
 
 ---
 

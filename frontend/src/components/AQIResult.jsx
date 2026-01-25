@@ -1,4 +1,8 @@
+import { useState } from 'react'
+
 function AQIResult({ data }) {
+  const [isPollutantsExpanded, setIsPollutantsExpanded] = useState(false)
+  
   const { 
     aqi, 
     category, 
@@ -70,8 +74,23 @@ function AQIResult({ data }) {
 
   const futureForecast = getFutureForecast()
 
+  // Animated smoke CSS keyframes
+  const smokeAnimation = `
+    @keyframes float {
+      0%, 100% { transform: translateY(0px) translateX(0px); opacity: 0.6; }
+      50% { transform: translateY(-10px) translateX(5px); opacity: 0.8; }
+    }
+    @keyframes smoke {
+      0% { transform: scale(1) rotate(0deg); }
+      50% { transform: scale(1.1) rotate(5deg); }
+      100% { transform: scale(1) rotate(0deg); }
+    }
+  `
+
   return (
     <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+      <style>{smokeAnimation}</style>
+      
       {/* Compact Header with AQI */}
       <div className="p-4 sm:p-5" style={{ backgroundColor: colors.light }}>
         <div className="flex items-center gap-4">
@@ -94,11 +113,18 @@ function AQIResult({ data }) {
               <span className="text-xl">{getAQIEmoji(aqi)}</span>
               <span className="font-bold text-gray-900">{category}</span>
             </div>
-            <div className="flex items-center gap-1.5 text-gray-500 text-sm mb-1">
-              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              </svg>
-              <span className="truncate" title={location}>{location}</span>
+            <div className="text-gray-500 text-xs mb-1">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                </svg>
+                <span className="truncate">Based on the monitoring station closest to you</span>
+              </div>
+              {location && (
+                <div className="pl-5 text-gray-600 font-medium">
+                  {location}
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-1.5 text-gray-400 text-xs">
               <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -112,7 +138,7 @@ function AQIResult({ data }) {
 
       {/* Info Grid */}
       <div className="p-4 sm:p-5 space-y-4">
-        {/* Cigarette Equivalent & Health Row */}
+        {/* Cigarette Equivalent & Main Pollutant Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Cigarette Equivalent */}
           <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
@@ -125,10 +151,29 @@ function AQIResult({ data }) {
             </div>
           </div>
           
-          {/* Dominant Pollutant */}
+          {/* Main Pollutant with Animated Smoke */}
           {dominant_pollutant && dominant_pollutant !== 'Unknown' && (
             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-              <span className="text-2xl">🎯</span>
+              <div className="relative w-8 h-8">
+                <div 
+                  className="absolute inset-0 text-2xl"
+                  style={{ 
+                    animation: 'float 3s ease-in-out infinite',
+                    filter: 'blur(1px)'
+                  }}
+                >
+                  💨
+                </div>
+                <div 
+                  className="absolute inset-0 text-2xl"
+                  style={{ 
+                    animation: 'smoke 4s ease-in-out infinite',
+                    animationDelay: '0.5s'
+                  }}
+                >
+                  💨
+                </div>
+              </div>
               <div>
                 <p className="text-xs text-gray-500">Main Pollutant</p>
                 <p className="font-bold text-gray-900">{dominant_pollutant}</p>
@@ -176,30 +221,48 @@ function AQIResult({ data }) {
           </div>
         )}
 
-        {/* Pollutant Breakdown - Compact */}
+        {/* Collapsible Explore Pollutants Section */}
         {pollutant_breakdown && Object.keys(pollutant_breakdown).length > 0 && (
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">📊 Pollutants</p>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(pollutant_breakdown).map(([pollutant, value], index) => {
-                const pColors = getAQIColor(value)
-                return (
-                  <div 
-                    key={index} 
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm"
-                    style={{ backgroundColor: pColors.light }}
-                  >
-                    <span className="font-medium text-gray-700">{pollutant}</span>
-                    <span 
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                      style={{ backgroundColor: pColors.bg }}
+            <button
+              onClick={() => setIsPollutantsExpanded(!isPollutantsExpanded)}
+              className="w-full flex items-center justify-between p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
+            >
+              <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                🔍 Explore Pollutants
+              </span>
+              <svg 
+                className={`w-5 h-5 text-gray-500 transition-transform ${isPollutantsExpanded ? 'rotate-180' : ''}`}
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {isPollutantsExpanded && (
+              <div className="mt-2 flex flex-wrap gap-2 p-3 bg-gray-50 rounded-xl">
+                {Object.entries(pollutant_breakdown).map(([pollutant, value], index) => {
+                  const pColors = getAQIColor(value)
+                  return (
+                    <div 
+                      key={index} 
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm"
+                      style={{ backgroundColor: pColors.light }}
                     >
-                      {Math.round(value)}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
+                      <span className="font-medium text-gray-700">{pollutant}</span>
+                      <span 
+                        className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                        style={{ backgroundColor: pColors.bg }}
+                      >
+                        {Math.round(value)}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

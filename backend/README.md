@@ -11,7 +11,7 @@ This document explains the architecture, how FastAPI works, and walks through th
 ```
 backend/
 ├── main.py              ← API server (endpoints live here)
-├── aqi_calculator.py    ← AQI calculation logic (pure Python)
+├── aqi_calculator.py    ← AQI calculation logic (EPA formula)
 ├── aqicn_client.py      ← HTTP client for AQICN API
 ├── requirements.txt     ← Python dependencies
 ├── Dockerfile           ← Container config (for deployment)
@@ -396,6 +396,7 @@ def calculate_aqi(pollutants: dict, standard: AQIStandard = AQIStandard.EPA) -> 
 | POST | `/aqi/location` | Get AQI by coordinates | `{latitude, longitude}` |
 | GET | `/search?keyword=...` | Search stations | - |
 | GET | `/aqi/station/{id}` | Get AQI for station | - |
+| POST | `/calculate-aqi` | Calculate AQI from pollutant data | `{location, date, pm25?, pm10?, ...}` |
 
 ### Response Format for `/aqi/location`
 

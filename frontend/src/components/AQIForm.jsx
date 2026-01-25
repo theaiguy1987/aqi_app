@@ -255,12 +255,22 @@ function AQIForm({ onSubmit, loading }) {
     setUseCurrentLocation(false)
   }
 
+  const handleInputFocus = () => {
+    // Clear input on focus for better UX
+    setLocationInput('')
+    setSelectedLocation(null)
+    setUseCurrentLocation(false)
+    if (predictions.length > 0) {
+      setShowPredictions(true)
+    }
+  }
+
   return (
     <div className="bg-white rounded-2xl shadow-xl p-7 border border-gray-100">
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
           <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
           </svg>
         </div>
         <div>
@@ -297,7 +307,7 @@ function AQIForm({ onSubmit, loading }) {
               id="location"
               value={locationInput}
               onChange={handleInputChange}
-              onFocus={() => predictions.length > 0 && setShowPredictions(true)}
+              onFocus={handleInputFocus}
               placeholder="Type a city, address, or place..."
               className="w-full pl-11 pr-10 py-3.5 bg-gray-50 border-2 border-gray-100 rounded-xl focus:ring-0 focus:border-indigo-400 focus:bg-white transition-all placeholder:text-gray-400"
               disabled={loading || gettingLocation}

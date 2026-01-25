@@ -1,6 +1,6 @@
-# ⚛️ Frontend - React Application
+# ⚛️ Frontend - React Application (aqitoday.in)
 
-Welcome to the React frontend! This document explains React concepts, the project structure, and walks through the code.
+Welcome to the React frontend for **aqitoday.in**! This document explains React concepts, the project structure, and walks through the code.
 
 > **Don't panic!** React looks different from Python, but the concepts are similar. This guide will help you understand.
 
@@ -21,11 +21,13 @@ frontend/
 │   │   └── Blog.jsx       ← Blog page
 │   └── components/
 │       ├── Navigation.jsx ← Top nav bar with location search
-│       └── AQIResult.jsx  ← AQI result display with cigarette equivalent
+│       ├── AQIResult.jsx  ← AQI result display with cigarette equivalent
+│       └── AQIForm.jsx    ← Manual AQI input form
 ├── index.html             ← HTML template
 ├── package.json           ← Dependencies (like requirements.txt)
 ├── vite.config.js         ← Build tool config
-└── tailwind.config.js     ← CSS framework config
+├── tailwind.config.js     ← CSS framework config
+└── Dockerfile             ← Container config for deployment
 ```
 
 ---
@@ -53,6 +55,7 @@ graph TB
     
     subgraph "Components"
         RESULT[AQIResult.jsx]
+        FORM[AQIForm.jsx]
     end
     
     HTML --> MAIN
@@ -63,6 +66,7 @@ graph TB
     ROUTER --> CALC
     ROUTER --> BLOG
     CALC --> RESULT
+    CALC --> FORM
     NAV -->|setSelectedLocation| CTX
     CTX -->|aqiData| CALC
     
@@ -70,6 +74,7 @@ graph TB
     style CALC fill:#61dafb
     style NAV fill:#90caf9
     style RESULT fill:#90caf9
+    style FORM fill:#90caf9
 ```
 
 ### Component Hierarchy
@@ -80,7 +85,8 @@ App
 │   ├── Navigation (location search bar - always visible)
 │   └── Routes
 │       ├── "/" → Calculator
-│       │         └── AQIResult (results display)
+│       │         ├── AQIResult (results display)
+│       │         └── AQIForm (manual input form)
 │       └── "/blog" → Blog
 ```
 
@@ -464,14 +470,32 @@ function Navigation() {
     })
   }
 
+  // Auto-clear input on focus for better UX
+  const handleInputFocus = () => {
+    setLocationInput('')
+    setSelectedLocation(null)
+  }
+
   return (
     <nav className="...">
-      {/* Logo */}
-      <Link to="/">AirQuality</Link>
+      {/* Logo - aqitoday.in with wind/air icon */}
+      <Link to="/">
+        <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl">
+          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {/* Wind/Air icon representing air quality */}
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+          </svg>
+        </div>
+        <span>aqitoday.in</span>
+      </Link>
       
-      {/* Search bar */}
+      {/* Search bar with auto-clear on focus */}
       <input 
         value={locationInput}
+        onChange={(e) => setLocationInput(e.target.value)}
+        onFocus={handleInputFocus}  // Clears input when clicked
+        placeholder="Search location..."
+      />
         onChange={(e) => setLocationInput(e.target.value)}
         placeholder="Search location..."
       />
@@ -525,57 +549,92 @@ function Calculator() {
 
 ### Result Component: `components/AQIResult.jsx`
 
-Displays the AQI data with the new design:
+Displays the AQI data with a clean, uncluttered design:
 
 ```jsx
 function AQIResult({ data }) {
-  const { aqi, category, location, message, pollutant_breakdown } = data
+  const [isPollutantsExpanded, setIsPollutantsExpanded] = useState(false)
+  const { aqi, category, location, message, pollutant_breakdown, forecast, dominant_pollutant } = data
 
   // Calculate cigarette equivalent (22 µg/m³ PM2.5 ≈ 1 cigarette)
   const cigarettes = getCigaretteEquivalent(aqi)
 
   return (
-    <div className="space-y-6">
-      {/* Main AQI Card */}
-      <div className="bg-white rounded-3xl shadow-xl">
-        {/* Big AQI number with color */}
-        <div className={`bg-gradient-to-br ${getAQIGradient(aqi)} p-10`}>
-          <p className="text-9xl font-black">{aqi}</p>
-          <p className="text-xl">{category}</p>
-        </div>
-
-        {/* Station info */}
-        <div className="p-4 bg-gray-50 rounded-xl">
-          <p>Nearest Station</p>
-          <p className="font-semibold">{location}</p>
-        </div>
-
-        {/* Cigarette equivalent */}
-        <div className="p-5 rounded-2xl">
-          <p>🚬 Equivalent: {cigarettes} cigarettes/day</p>
-        </div>
-
-        {/* Health advice */}
-        <div className="p-5 bg-amber-50 rounded-xl">
-          <p>⚠️ {message}</p>
+    <div className="bg-white rounded-2xl shadow-lg">
+      {/* Compact Header with AQI */}
+      <div className="p-5 bg-light-colored">
+        <div className="flex items-center gap-4">
+          {/* AQI Circle */}
+          <div className="w-24 h-24 rounded-full" style={{ backgroundColor: colors.bg }}>
+            <span className="text-4xl font-black">{aqi}</span>
+          </div>
+          
+          {/* Status & Location */}
+          <div>
+            <div>{getAQIEmoji(aqi)} {category}</div>
+            
+            {/* Station info - Shows "Based on monitoring station closest to you" */}
+            <div>
+              <span>📍 Based on the monitoring station closest to you</span>
+              {/* Station name displayed below */}
+              {location && <div className="font-medium">{location}</div>}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Pollutant breakdown */}
-      {pollutant_breakdown && (
-        <div className="grid grid-cols-3 gap-3">
-          {Object.entries(pollutant_breakdown).map(([name, value]) => (
-            <div key={name} className="p-4 rounded-xl text-center">
-              <p>{name}</p>
-              <p className="text-2xl font-bold">{value}</p>
-            </div>
-          ))}
+      {/* Info Grid - Visible by default */}
+      <div className="p-5 space-y-4">
+        {/* Cigarette Equivalent & Main Pollutant with Animated Smoke */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>🚬 {cigarettes} cigarettes/day</div>
+          <div>💨 Main Pollutant: {dominant_pollutant}</div>
         </div>
-      )}
+
+        {/* Health Advice */}
+        <div>💡 {message}</div>
+
+        {/* Forecast - Always visible */}
+        {forecast && <div>📅 Forecast: ...</div>}
+
+        {/* Collapsible "Explore Pollutants" Section */}
+        {pollutant_breakdown && (
+          <div>
+            <button onClick={() => setIsPollutantsExpanded(!isPollutantsExpanded)}>
+              🔍 Explore Pollutants
+            </button>
+            
+            {isPollutantsExpanded && (
+              <div className="grid grid-cols-3 gap-3">
+                {Object.entries(pollutant_breakdown).map(([name, value]) => (
+                  <div key={name}>{name}: {value}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Pollutant Level Indicator - Left as is */}
+      <div className="px-5 pb-5">
+        <div className="flex rounded-lg h-2">
+          <div className="flex-1 bg-emerald-500"></div>
+          <div className="flex-1 bg-amber-500"></div>
+          <div className="flex-1 bg-red-500"></div>
+          {/* ... more colors ... */}
+        </div>
+      </div>
     </div>
   )
 }
 ```
+
+**Recent UX Improvements:**
+- **Station information**: Now clearly shows "Based on the monitoring station closest to you" with the actual station name displayed prominently
+- **Animated smoke icon**: The main pollutant section features an animated smoke emoji (💨) for visual appeal
+- **Collapsible pollutants**: The detailed pollutant breakdown is hidden by default in a collapsible "Explore Pollutants" section to reduce clutter
+- **Key info visible**: AQI value, cigarettes equivalent, main pollutant, and forecast remain visible by default
+- **Clean design**: Focuses on the most important information first, with additional details available on demand
 
 ---
 
