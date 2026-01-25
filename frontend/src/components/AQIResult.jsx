@@ -577,7 +577,7 @@ function AQIResult({ data }) {
         <details className="group">
           <summary className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-gray-50 to-transparent cursor-pointer list-none">
             <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide flex items-center gap-1.5">
-              <span>💡</span> Health Details
+              <span>💡</span> Health Advice
             </span>
             <svg className="w-4 h-4 text-gray-400 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -588,26 +588,7 @@ function AQIResult({ data }) {
           </div>
         </details>
 
-        {/* 2-Day Forecast */}
-        {futureForecast.length > 0 && (
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">📅 Next Days</p>
-            <div className="grid grid-cols-2 gap-2">
-              {futureForecast.map((day, index) => {
-                const dayColors = getAQIColor(day.avg)
-                const dayName = new Date(day.day).toLocaleDateString('en-US', { weekday: 'short' })
-                return (
-                  <div key={index} className="flex items-center gap-2 p-2 rounded-lg" style={{ backgroundColor: dayColors.light }}>
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: dayColors.bg }}>
-                      {day.avg}
-                    </div>
-                    <span className="text-sm font-medium text-gray-700">{dayName}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
+        {/* Next days forecast removed — forecasts were found to be inaccurate and are hidden from UI */}
 
         {/* Pollutant Breakdown */}
         {pollutant_breakdown && Object.keys(pollutant_breakdown).length > 0 && (
