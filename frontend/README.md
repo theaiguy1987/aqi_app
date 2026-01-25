@@ -21,7 +21,7 @@ frontend/
 │   │   └── Blog.jsx       ← Blog page
 │   └── components/
 │       ├── Navigation.jsx ← Top nav bar with location search
-│       ├── AQIResult.jsx  ← AQI result display with cigarette equivalent
+│       ├── AQIResult.jsx  ← AQI result display with confidence badge, actions, sharing & subscriptions
 │       └── AQIForm.jsx    ← Manual AQI input form
 ├── index.html             ← HTML template
 ├── package.json           ← Dependencies (like requirements.txt)
