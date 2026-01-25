@@ -256,13 +256,12 @@ function AQIForm({ onSubmit, loading }) {
   }
 
   const handleInputFocus = () => {
-    // Clear input on focus for better UX
+    // Clear input on focus for better UX - makes it obvious user should type
     setLocationInput('')
     setSelectedLocation(null)
     setUseCurrentLocation(false)
-    if (predictions.length > 0) {
-      setShowPredictions(true)
-    }
+    setPredictions([])
+    setShowPredictions(false)
   }
 
   return (
@@ -308,7 +307,7 @@ function AQIForm({ onSubmit, loading }) {
               value={locationInput}
               onChange={handleInputChange}
               onFocus={handleInputFocus}
-              placeholder="Type a city, address, or place..."
+              placeholder="🔍 Search your city, area or landmark..."
               className="w-full pl-11 pr-10 py-3.5 bg-gray-50 border-2 border-gray-100 rounded-xl focus:ring-0 focus:border-indigo-400 focus:bg-white transition-all placeholder:text-gray-400"
               disabled={loading || gettingLocation}
               autoComplete="off"

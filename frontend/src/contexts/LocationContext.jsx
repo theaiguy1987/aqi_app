@@ -35,7 +35,7 @@ export function LocationProvider({ children }) {
   const [error, setError] = useState(null)
 
   // Fetch AQI data for a location
-  const fetchAQI = useCallback(async (latitude, longitude) => {
+  const fetchAQI = useCallback(async (latitude, longitude, userLocationName = null) => {
     setLoading(true)
     setError(null)
 
@@ -60,6 +60,7 @@ export function LocationProvider({ children }) {
         category: data.category,
         color: data.color,
         location: data.station_name,
+        user_location_name: userLocationName,  // User's searched/selected location
         date: data.fetched_at,
         dominant_pollutant: data.dominant_pollutant,
         message: data.message,
@@ -184,7 +185,9 @@ export function LocationProvider({ children }) {
     setSelectedLocation(location)
     setLocationError(null)
     if (location) {
-      fetchAQI(location.latitude, location.longitude)
+      // Pass the location name if it's a searched place (not current location)
+      const userLocationName = location.name !== 'Current Location' ? location.name : null
+      fetchAQI(location.latitude, location.longitude, userLocationName)
     }
   }, [fetchAQI])
 

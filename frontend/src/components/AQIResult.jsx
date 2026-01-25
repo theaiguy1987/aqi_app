@@ -1,11 +1,32 @@
 import { useState, useRef } from 'react'
 
+// Common country codes for international phone support
+const COUNTRY_CODES = [
+  { code: '+1', country: '🇺🇸 US/CA', maxLength: 10 },
+  { code: '+44', country: '🇬🇧 UK', maxLength: 10 },
+  { code: '+91', country: '🇮🇳 India', maxLength: 10 },
+  { code: '+61', country: '🇦🇺 AU', maxLength: 9 },
+  { code: '+49', country: '🇩🇪 DE', maxLength: 11 },
+  { code: '+33', country: '🇫🇷 FR', maxLength: 9 },
+  { code: '+81', country: '🇯🇵 JP', maxLength: 10 },
+  { code: '+86', country: '🇨🇳 CN', maxLength: 11 },
+  { code: '+971', country: '🇦🇪 UAE', maxLength: 9 },
+  { code: '+65', country: '🇸🇬 SG', maxLength: 8 },
+  { code: '+60', country: '🇲🇾 MY', maxLength: 10 },
+  { code: '+966', country: '🇸🇦 SA', maxLength: 9 },
+]
+
 function AQIResult({ data }) {
   const [isPollutantsExpanded, setIsPollutantsExpanded] = useState(false)
   const [showShareMenu, setShowShareMenu] = useState(false)
   const [showSubscribeModal, setShowSubscribeModal] = useState(false)
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false)
+  const [feedbackRating, setFeedbackRating] = useState(0)
+  const [feedbackText, setFeedbackText] = useState('')
+  const [feedbackStatus, setFeedbackStatus] = useState(null)
   const [subscribeEmail, setSubscribeEmail] = useState('')
   const [subscribePhone, setSubscribePhone] = useState('')
+  const [subscribeCountryCode, setSubscribeCountryCode] = useState('+91')
   const [subscribeMethod, setSubscribeMethod] = useState('email')
   const [subscribeStatus, setSubscribeStatus] = useState(null)
   const shareCardRef = useRef(null)
@@ -13,14 +34,20 @@ function AQIResult({ data }) {
   const { 
     aqi, 
     category, 
-    location, 
+    location,  // This is actually the station name from backend
     dominant_pollutant, 
     message, 
     measurement_time, 
     forecast, 
     pollutant_breakdown,
-    distance_km
+    distance_km,
+    user_coordinates,
+    coordinates
   } = data
+
+  // Get user-friendly location name (we'll use reverse geocoding result if available, or fallback)
+  const userLocationName = data.user_location_name || null
+  const stationName = location  // The station name from API
 
   // Calculate cigarette equivalent
   const getCigaretteEquivalent = (aqiValue) => {
@@ -261,24 +288,96 @@ function AQIResult({ data }) {
     e.preventDefault()
     setSubscribeStatus('loading')
     
-    const subscriptions = JSON.parse(localStorage.getItem('aqiSubscriptions') || '[]')
-    subscriptions.push({
-      method: subscribeMethod,
-      value: subscribeMethod === 'email' ? subscribeEmail : subscribePhone,
-      location: location,
-      coordinates: data.user_coordinates || data.coordinates,
-      createdAt: new Date().toISOString()
-    })
-    localStorage.setItem('aqiSubscriptions', JSON.stringify(subscriptions))
+    try {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+      const coords = data.user_coordinates || data.coordinates || {}
+      
+      // For WhatsApp, combine country code with phone number
+      const contactValue = subscribeMethod === 'email' 
+        ? subscribeEmail 
+        : `${subscribeCountryCode}${subscribePhone}`
+      
+      const response = await fetch(`${API_BASE}/subscribe`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          method: subscribeMethod === 'whatsapp' ? 'phone' : subscribeMethod,
+          contact: contactValue,
+          location: location || 'Unknown',
+          latitude: coords.latitude || null,
+          longitude: coords.longitude || null
+        })
+      })
+      
+      const result = await response.json()
+      
+      if (response.ok && result.success) {
+        setSubscribeStatus('success')
+        setTimeout(() => {
+          setShowSubscribeModal(false)
+          setSubscribeStatus(null)
+          setSubscribeEmail('')
+          setSubscribePhone('')
+        }, 2000)
+      } else {
+        setSubscribeStatus('error')
+        console.error('Subscription failed:', result)
+        setTimeout(() => setSubscribeStatus(null), 3000)
+      }
+    } catch (error) {
+      console.error('Subscription error:', error)
+      setSubscribeStatus('error')
+      setTimeout(() => setSubscribeStatus(null), 3000)
+    }
+  }
+
+  // Feedback handler
+  const handleFeedback = async (e) => {
+    e.preventDefault()
+    if (feedbackRating === 0) return
     
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setSubscribeStatus('success')
-    setTimeout(() => {
-      setShowSubscribeModal(false)
-      setSubscribeStatus(null)
-      setSubscribeEmail('')
-      setSubscribePhone('')
-    }, 2000)
+    setFeedbackStatus('loading')
+    
+    try {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+      const coords = data.user_coordinates || data.coordinates || {}
+      
+      const response = await fetch(`${API_BASE}/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          rating: feedbackRating,
+          feedback: feedbackText,
+          location: location || 'Unknown',
+          latitude: coords.latitude || null,
+          longitude: coords.longitude || null
+        })
+      })
+      
+      const result = await response.json()
+      
+      if (response.ok && result.success) {
+        setFeedbackStatus('success')
+        setTimeout(() => {
+          setShowFeedbackModal(false)
+          setFeedbackStatus(null)
+          setFeedbackRating(0)
+          setFeedbackText('')
+        }, 2000)
+      } else {
+        setFeedbackStatus('error')
+        console.error('Feedback failed:', result)
+        setTimeout(() => setFeedbackStatus(null), 3000)
+      }
+    } catch (error) {
+      console.error('Feedback error:', error)
+      setFeedbackStatus('error')
+      setTimeout(() => setFeedbackStatus(null), 3000)
+    }
   }
 
   // CSS animations
@@ -296,11 +395,19 @@ function AQIResult({ data }) {
       0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
       50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
     }
+    @keyframes pulse-glow-amber {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+      50% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+    }
     @keyframes bell-ring {
       0%, 100% { transform: rotate(0deg); }
       10%, 30%, 50% { transform: rotate(8deg); }
       20%, 40% { transform: rotate(-8deg); }
       60% { transform: rotate(0deg); }
+    }
+    @keyframes star-pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.3); }
     }
   `
 
@@ -330,8 +437,17 @@ function AQIResult({ data }) {
               <span className="text-xl">{getAQIEmoji(aqi)}</span>
               <span className="font-bold text-gray-900 text-lg">{category}</span>
             </div>
-            {location && (
-              <p className="text-gray-600 text-sm font-medium truncate mb-1">{location}</p>
+            
+            {/* User Location - resolved text */}
+            {userLocationName && (
+              <p className="text-gray-800 text-sm font-semibold truncate">📍 Your location → {userLocationName}</p>
+            )}
+            
+            {/* Station info - show as "Data from nearest station" */}
+            {stationName && (
+              <p className="text-gray-500 text-xs truncate mb-1">
+                <span className="text-gray-400">Data from nearest station:</span> {stationName}
+              </p>
             )}
             
             {/* Distance & Freshness */}
@@ -357,6 +473,16 @@ function AQIResult({ data }) {
       {/* Action Buttons - Moved Up */}
       <div className="px-4 sm:px-5 py-3 bg-gradient-to-r from-gray-50 to-gray-100/50 border-b border-gray-100">
         <div className="flex gap-2">
+          {/* Rate App Button - Prominent & Flashing */}
+          <button
+            onClick={() => setShowFeedbackModal(true)}
+            className="flex items-center justify-center gap-1.5 py-2.5 px-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-medium transition-all text-sm"
+            style={{ animation: 'pulse-glow-amber 2s ease-in-out infinite' }}
+          >
+            <span style={{ animation: 'star-pulse 1.5s ease-in-out infinite', display: 'inline-block' }}>⭐</span>
+            Rate
+          </button>
+          
           {/* Share Button */}
           <div className="relative flex-1">
             <button
@@ -527,12 +653,101 @@ function AQIResult({ data }) {
         </div>
       </div>
 
-      {/* Attribution */}
-      <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
-        <p className="text-[9px] text-gray-400 text-center">
+      {/* Attribution & Feedback */}
+      <div className="px-4 py-2 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+        <p className="text-[9px] text-gray-400">
           Data: <a href="https://waqi.info/" target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:underline">WAQI</a>
         </p>
+        <button 
+          onClick={() => setShowFeedbackModal(true)}
+          className="text-[10px] text-gray-400 hover:text-indigo-500 flex items-center gap-1 transition-colors"
+        >
+          <span>💬</span> Send feedback
+        </button>
       </div>
+
+      {/* Feedback Modal */}
+      {showFeedbackModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowFeedbackModal(false)}>
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                ⭐ Rate Your Experience
+              </h3>
+              <button onClick={() => setShowFeedbackModal(false)} className="p-1 hover:bg-gray-100 rounded-full">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            {feedbackStatus === 'success' ? (
+              <div className="text-center py-4">
+                <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-2xl">🙏</span>
+                </div>
+                <p className="font-semibold text-gray-900">Thank you!</p>
+                <p className="text-xs text-gray-500">Your feedback helps us improve</p>
+              </div>
+            ) : feedbackStatus === 'error' ? (
+              <div className="text-center py-4">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-2xl">😕</span>
+                </div>
+                <p className="font-semibold text-gray-900">Oops!</p>
+                <p className="text-xs text-gray-500">Something went wrong. Please try again.</p>
+              </div>
+            ) : (
+              <form onSubmit={handleFeedback}>
+                <p className="text-gray-600 text-sm mb-4">
+                  How was your experience with AQI Today?
+                </p>
+                
+                {/* Star Rating */}
+                <div className="flex justify-center gap-2 mb-4">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setFeedbackRating(star)}
+                      className={`text-3xl transition-transform hover:scale-110 ${
+                        star <= feedbackRating ? 'opacity-100' : 'opacity-30'
+                      }`}
+                    >
+                      ⭐
+                    </button>
+                  ))}
+                </div>
+                
+                {/* Rating labels */}
+                <div className="flex justify-between text-[10px] text-gray-400 mb-4 px-1">
+                  <span>Poor</span>
+                  <span>Amazing!</span>
+                </div>
+                
+                {/* Feedback text */}
+                <textarea
+                  value={feedbackText}
+                  onChange={(e) => setFeedbackText(e.target.value)}
+                  placeholder="Tell us more (optional)..."
+                  rows={3}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm resize-none"
+                />
+                
+                <button 
+                  type="submit" 
+                  disabled={feedbackStatus === 'loading' || feedbackRating === 0}
+                  className="w-full mt-3 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium text-sm flex items-center justify-center gap-2"
+                >
+                  {feedbackStatus === 'loading' ? (
+                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>Sending...</>
+                  ) : 'Submit Feedback'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Subscribe Modal */}
       {showSubscribeModal && (
@@ -563,6 +778,14 @@ function AQIResult({ data }) {
                 <p className="font-semibold text-gray-900">You're subscribed!</p>
                 <p className="text-xs text-gray-500">First alert tomorrow 8 AM</p>
               </div>
+            ) : subscribeStatus === 'error' ? (
+              <div className="text-center py-4">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-2xl">😕</span>
+                </div>
+                <p className="font-semibold text-gray-900">Oops!</p>
+                <p className="text-xs text-gray-500">Something went wrong. Please try again.</p>
+              </div>
             ) : (
               <form onSubmit={handleSubscribe}>
                 <div className="flex rounded-lg bg-gray-100 p-1 mb-3">
@@ -582,20 +805,41 @@ function AQIResult({ data }) {
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
                 ) : (
                   <div className="flex gap-2">
-                    <span className="flex items-center px-3 bg-gray-100 rounded-lg text-gray-500 text-sm">+91</span>
-                    <input type="tel" value={subscribePhone} onChange={(e) => setSubscribePhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                      placeholder="Mobile number" required pattern="[0-9]{10}"
-                      className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" />
+                    {/* International Country Code Selector */}
+                    <select 
+                      value={subscribeCountryCode}
+                      onChange={(e) => setSubscribeCountryCode(e.target.value)}
+                      className="px-2 py-2.5 bg-gray-100 border border-gray-200 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      {COUNTRY_CODES.map(({ code, country }) => (
+                        <option key={code} value={code}>{country} {code}</option>
+                      ))}
+                    </select>
+                    <input 
+                      type="tel" 
+                      value={subscribePhone} 
+                      onChange={(e) => {
+                        const selectedCountry = COUNTRY_CODES.find(c => c.code === subscribeCountryCode)
+                        const maxLen = selectedCountry?.maxLength || 15
+                        setSubscribePhone(e.target.value.replace(/\D/g, '').slice(0, maxLen))
+                      }}
+                      placeholder="Phone number" 
+                      required 
+                      className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm" 
+                    />
                   </div>
                 )}
                 
                 <button type="submit" disabled={subscribeStatus === 'loading'}
                   className="w-full mt-3 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-400 text-white rounded-lg font-medium text-sm flex items-center justify-center gap-2">
                   {subscribeStatus === 'loading' ? (
-                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>Subscribing...</>
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Hang in there... saving your details</span>
+                    </>
                   ) : 'Subscribe Free'}
                 </button>
-                <p className="text-[10px] text-gray-400 text-center mt-2">Unsubscribe anytime</p>
+                <p className="text-[10px] text-gray-400 text-center mt-2">Unsubscribe anytime • Works worldwide 🌍</p>
               </form>
             )}
           </div>

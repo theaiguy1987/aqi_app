@@ -397,6 +397,58 @@ def calculate_aqi(pollutants: dict, standard: AQIStandard = AQIStandard.EPA) -> 
 | GET | `/search?keyword=...` | Search stations | - |
 | GET | `/aqi/station/{id}` | Get AQI for station | - |
 | POST | `/calculate-aqi` | Calculate AQI from pollutant data | `{location, date, pm25?, pm10?, ...}` |
+| POST | `/subscribe` | Subscribe to daily AQI alerts | `{method, contact, location, latitude?, longitude?}` |
+| POST | `/feedback` | Submit user feedback with star rating | `{rating, feedback?, location?, latitude?, longitude?}` |
+
+### Subscription Endpoint `/subscribe`
+
+Subscribe users to receive daily AQI alerts. Data is stored in Google Sheets.
+
+**Request:**
+```json
+{
+  "method": "email",          // "email" or "phone"
+  "contact": "user@example.com",
+  "location": "Delhi, India",
+  "latitude": 28.6,           // optional
+  "longitude": 77.2           // optional
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Successfully subscribed to daily AQI alerts!",
+  "subscription_id": "SUB_20260125120000"
+}
+```
+
+### Feedback Endpoint `/feedback`
+
+Submit user feedback with star rating. Data is stored in a separate "Feedback" tab in Google Sheets.
+
+**Request:**
+```json
+{
+  "rating": 5,                // 1-5 stars (required)
+  "feedback": "Great app!",   // optional text
+  "location": "HSR Layout",   // optional
+  "latitude": 12.91,          // optional
+  "longitude": 77.64          // optional
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Thank you for your feedback!",
+  "feedback_id": "FB_20260125120000"
+}
+```
+
+> 📖 **Setup**: See [GOOGLE_SHEETS_SETUP.md](../GOOGLE_SHEETS_SETUP.md) for configuring Google Sheets storage.
 
 ### Response Format for `/aqi/location`
 

@@ -16,9 +16,11 @@ from typing import Optional, List
 from datetime import datetime
 import uvicorn
 import os
+import httpx
 
 from aqicn_client import fetch_aqi_by_location, get_aqicn_client
 from aqi_calculator import calculate_aqi, generate_sample_pollutant_data
+from sheets_client import add_subscription, check_subscription_exists, add_feedback
 import math
 
 
@@ -41,6 +43,39 @@ def calculate_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) ->
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
     
     return round(R * c, 2)
+
+
+async def reverse_geocode(latitude: float, longitude: float) -> Optional[str]:
+    """
+    Convert coordinates to a human-readable location name using Nominatim.
+    Returns None if geocoding fails (fallback gracefully).
+    """
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(
+                "https://nominatim.openstreetmap.org/reverse",
+                params={
+                    "lat": latitude,
+                    "lon": longitude,
+                    "format": "json",
+                    "zoom": 10,  # City level
+                },
+                headers={"User-Agent": "AQI-App/1.0"}
+            )
+            if response.status_code == 200:
+                data = response.json()
+                address = data.get("address", {})
+                # Build location name from address components
+                city = address.get("city") or address.get("town") or address.get("village") or address.get("suburb")
+                state = address.get("state")
+                country = address.get("country")
+                
+                parts = [p for p in [city, state, country] if p]
+                return ", ".join(parts[:2]) if parts else None  # Return city, state/country
+    except Exception as e:
+        print(f"Reverse geocoding failed: {e}")
+    return None
+
 
 app = FastAPI(
     title="AQI Calculator API",
@@ -97,6 +132,7 @@ class LocationAQIResponse(BaseModel):
     station_url: Optional[str] = None
     coordinates: dict  # Station coordinates
     user_coordinates: Optional[dict] = None  # User's requested coordinates
+    user_location_name: Optional[str] = None  # Reverse geocoded location name
     distance_km: Optional[float] = None  # Distance from user to station in km
     aqi: Optional[int] = None
     category: str
@@ -141,6 +177,38 @@ class ManualAQIResponse(BaseModel):
     date: str
     dominant_pollutant: str
     message: str
+
+
+class SubscriptionRequest(BaseModel):
+    """Request model for AQI alert subscription."""
+    method: str = Field(..., description="Subscription method: 'email' or 'phone'")
+    contact: str = Field(..., description="Email address or phone number")
+    location: str = Field(..., description="Location name for alerts")
+    latitude: Optional[float] = Field(None, ge=-90, le=90, description="Latitude")
+    longitude: Optional[float] = Field(None, ge=-180, le=180, description="Longitude")
+
+
+class SubscriptionResponse(BaseModel):
+    """Response model for subscription."""
+    success: bool
+    message: str
+    subscription_id: Optional[str] = None
+
+
+class FeedbackRequest(BaseModel):
+    """Request model for user feedback."""
+    rating: int = Field(..., ge=1, le=5, description="Star rating 1-5")
+    feedback: Optional[str] = Field('', description="Optional text feedback")
+    location: Optional[str] = Field('', description="Location context")
+    latitude: Optional[float] = Field(None, ge=-90, le=90, description="Latitude")
+    longitude: Optional[float] = Field(None, ge=-180, le=180, description="Longitude")
+
+
+class FeedbackResponse(BaseModel):
+    """Response model for feedback."""
+    success: bool
+    message: str
+    feedback_id: Optional[str] = None
 
 
 # ============================================================
@@ -199,12 +267,16 @@ async def get_aqi_by_location(request: LocationAQIRequest):
             station_coords.get("longitude")
         )
         
+        # Reverse geocode user's coordinates to get location name
+        user_location_name = await reverse_geocode(request.latitude, request.longitude)
+        
         return LocationAQIResponse(
             station_id=data.get("station_id"),
             station_name=data.get("station_name", "Unknown"),
             station_url=data.get("station_url"),
             coordinates=station_coords,
             user_coordinates={"latitude": request.latitude, "longitude": request.longitude},
+            user_location_name=user_location_name,
             distance_km=distance_km,
             aqi=data.get("aqi"),
             category=data.get("category", "Unknown"),
@@ -367,6 +439,116 @@ async def calculate_aqi_endpoint(request: ManualAQIRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error calculating AQI: {str(e)}")
+
+
+# ============================================================
+# Subscription Endpoints
+# ============================================================
+
+@app.post("/subscribe", response_model=SubscriptionResponse)
+async def subscribe_to_alerts(request: SubscriptionRequest):
+    """
+    Subscribe to daily AQI alerts.
+    
+    Stores user contact info in Google Sheets for sending daily alerts.
+    
+    Args:
+        method: 'email' or 'phone'
+        contact: Email address or phone number
+        location: Location name for context
+        latitude: Optional latitude for precise location
+        longitude: Optional longitude for precise location
+    
+    Returns subscription confirmation.
+    """
+    try:
+        # Validate method
+        if request.method not in ['email', 'phone']:
+            raise HTTPException(status_code=400, detail="Method must be 'email' or 'phone'")
+        
+        # Basic validation
+        if request.method == 'email' and '@' not in request.contact:
+            raise HTTPException(status_code=400, detail="Invalid email address")
+        
+        # International phone validation: should start with + and have 8-15 digits
+        if request.method == 'phone':
+            phone = request.contact
+            if not phone.startswith('+'):
+                raise HTTPException(status_code=400, detail="Phone number must include country code (e.g., +1 for US)")
+            digits_only = phone.replace('+', '').replace(' ', '').replace('-', '')
+            if len(digits_only) < 8 or len(digits_only) > 15:
+                raise HTTPException(status_code=400, detail="Invalid phone number length")
+        
+        # Check if already subscribed
+        if check_subscription_exists(request.contact):
+            return SubscriptionResponse(
+                success=True,
+                message="You're already subscribed! We'll keep sending your daily alerts."
+            )
+        
+        # Add subscription
+        result = add_subscription(
+            method=request.method,
+            contact=request.contact,
+            location=request.location,
+            latitude=request.latitude,
+            longitude=request.longitude
+        )
+        
+        if result['success']:
+            return SubscriptionResponse(
+                success=True,
+                message=result.get('message', 'Successfully subscribed!'),
+                subscription_id=result.get('subscription_id')
+            )
+        else:
+            raise HTTPException(status_code=500, detail=result.get('error', 'Failed to subscribe'))
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing subscription: {str(e)}")
+
+
+@app.post("/feedback", response_model=FeedbackResponse)
+async def submit_feedback(request: FeedbackRequest):
+    """
+    Submit user feedback with star rating.
+    
+    Stores feedback in Google Sheets for analysis.
+    
+    Args:
+        rating: Star rating 1-5
+        feedback: Optional text feedback
+        location: Location context
+        latitude: Optional latitude
+        longitude: Optional longitude
+    
+    Returns feedback confirmation.
+    """
+    try:
+        # Add feedback
+        result = add_feedback(
+            rating=request.rating,
+            feedback=request.feedback or '',
+            location=request.location or '',
+            latitude=request.latitude,
+            longitude=request.longitude
+        )
+        
+        if result['success']:
+            return FeedbackResponse(
+                success=True,
+                message=result.get('message', 'Thank you for your feedback!'),
+                feedback_id=result.get('feedback_id')
+            )
+        else:
+            raise HTTPException(status_code=500, detail=result.get('error', 'Failed to submit feedback'))
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing feedback: {str(e)}")
 
 
 if __name__ == "__main__":

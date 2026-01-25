@@ -38,6 +38,11 @@ Thumbs.db
 .env.*.local
 frontend/.env.production
 
+# Google Cloud credentials (NEVER commit these!)
+credentials.json
+*-credentials.json
+service-account*.json
+
 # Logs
 logs/
 *.log
