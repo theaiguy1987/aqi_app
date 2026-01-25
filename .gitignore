@@ -46,3 +46,6 @@ service-account*.json
 # Logs
 logs/
 *.log
+
+# Deployment scripts (local)
+deploy.sh

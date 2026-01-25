@@ -19,18 +19,32 @@ Put your AQI Calculator on the internet so anyone can use it!
 
 ## What is Google Cloud Run?
 
-**Cloud Run** runs your app in containers without you managing servers:
-- ✅ Automatic scaling (0 to 1000s of users)
-- ✅ HTTPS automatically included
-- ✅ Pay only when someone uses it
-- ✅ Global availability
+Google Cloud Run is a **serverless** platform that runs your app in containers. Think of it as "upload your code, get a URL."
 
+```mermaid
+graph LR
+    subgraph "🏠 Local Development"
+        L1["localhost:3000<br/>(frontend)"]
+        L2["localhost:8000<br/>(backend)"]
+    end
+    
+    subgraph "☁️ Google Cloud Run"
+        C1["https://aqi-frontend-xxx.run.app"]
+        C2["https://aqi-backend-xxx.run.app"]
+    end
+    
+    L1 --> |"deploy"| C1
+    L2 --> |"deploy"| C2
 ```
-Local Development              →    Google Cloud Run
-───────────────────────────────────────────────────────
-localhost:3000 (frontend)      →    https://your-frontend.run.app
-localhost:8000 (backend)       →    https://your-backend.run.app
-```
+
+### Why Cloud Run?
+
+| Feature | What it means |
+|---------|---------------|
+| ✅ **Auto-scaling** | 0 users → 0 cost, 1000 users → auto handles it |
+| ✅ **HTTPS included** | Secure URLs automatically |
+| ✅ **Pay per use** | Only charged when someone uses your app |
+| ✅ **Free tier** | 2 million requests/month free |
 
 ---
 
@@ -38,28 +52,64 @@ localhost:8000 (backend)       →    https://your-backend.run.app
 
 ### 1. Google Cloud Account
 - Create at [cloud.google.com](https://cloud.google.com)
-- New users get **$300 free credit**
+- New users get **$300 free credit** for 90 days!
 
 ### 2. Google Cloud Project
+
+```mermaid
+flowchart LR
+    A["Go to Cloud Console"] --> B["Click project dropdown"]
+    B --> C["New Project"]
+    C --> D["Name it: aqi-calculator"]
+    D --> E["Note your Project ID"]
+```
+
 1. Go to [Google Cloud Console](https://console.cloud.google.com)
 2. Click project dropdown → **New Project**
 3. Name it (e.g., `aqi-calculator`)
 4. Note your **Project ID** (you'll need it!)
 
 ### 3. Enable Billing
-- Required even for free tier
+- Required even with free tier
 - Go to: **Billing** → **Link a billing account**
-- Don't worry: this app costs ~$0-2/month
+- Don't worry: this app costs ~$0-2/month with normal usage
+
+### 4. Google Analytics (Optional)
+- The app includes Google Analytics tracking (ID: G-5P95TPMZ43)
+- Integrated in `frontend/index.html` to monitor usage and performance
+- No additional configuration needed for deployment
 
 ---
 
 ## Quick Deploy (5 Minutes)
 
+### The Deployment Flow
+
+```mermaid
+sequenceDiagram
+    participant You
+    participant CloudShell as Cloud Shell
+    participant CloudBuild as Cloud Build
+    participant CloudRun as Cloud Run
+    
+    You->>CloudShell: Open terminal in browser
+    You->>CloudShell: Clone repo + set API keys
+    You->>CloudShell: Run ./deploy.sh
+    
+    CloudShell->>CloudBuild: Build backend Docker image
+    CloudBuild->>CloudRun: Deploy backend
+    CloudRun-->>CloudShell: Backend URL
+    
+    CloudShell->>CloudBuild: Build frontend (with backend URL)
+    CloudBuild->>CloudRun: Deploy frontend
+    CloudRun-->>You: 🎉 Frontend URL - Your app is live!
+```
+
 ### Step 1: Open Cloud Shell
 
 1. Go to [console.cloud.google.com](https://console.cloud.google.com)
-2. Click the terminal icon **>_** in the top right
-3. Wait for the shell to load
+2. Click the terminal icon **>_** in the top right corner
+3. Wait for the shell to load (it's a full Linux terminal in your browser!)
 
 ### Step 2: Get Your Code
 
@@ -68,7 +118,7 @@ localhost:8000 (backend)       →    https://your-backend.run.app
 git clone https://github.com/theaiguy1987/aqi_app.git
 cd aqi_app
 
-# Switch to deployment branch
+# Switch to deployment branch (if applicable)
 git checkout google-cloud-run
 
 # Set your project ID (replace with yours!)
@@ -77,32 +127,15 @@ gcloud config set project YOUR_PROJECT_ID
 
 ### Step 3: Set Up API Keys
 
-The app needs two API keys:
-
-#### AQICN API Token (Required)
-Fetches live air quality data:
-
-1. Go to [aqicn.org/data-platform/token](https://aqicn.org/data-platform/token/) and create a free account
-2. Get your API token from your profile
-3. Set it as an environment variable:
-
 ```bash
+# Required: AQICN token for air quality data
 export AQICN_API_TOKEN=your_token_here
-```
 
-#### Google Maps API Key (Optional but Recommended)
-Enables location autocomplete:
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/google/maps-apis/)
-2. Enable **Places API (New)** for your project
-3. Create an API key
-4. Set it as an environment variable:
-
-```bash
+# Optional: Google Maps for location autocomplete
 export GOOGLE_MAPS_API_KEY=your_key_here
 ```
 
-> 💡 **Without Google Maps API**: Users can still use GPS location or enter coordinates manually.
+> 🔑 Get your AQICN token at [aqicn.org/data-platform/token](https://aqicn.org/data-platform/token/)
 
 ### Step 4: Deploy!
 
@@ -110,22 +143,23 @@ export GOOGLE_MAPS_API_KEY=your_key_here
 # Make script executable
 chmod +x deploy.sh
 
-# Run deployment (uses AQICN_API_TOKEN and GOOGLE_MAPS_API_KEY from environment)
+# Run deployment
 ./deploy.sh
 ```
 
 **Wait 5-10 minutes.** When done, you'll see:
 ```
 ==========================================
-Deployment Complete!
+🎉 Deployment Complete!
 ==========================================
 Frontend: https://aqi-frontend-xxx-uc.a.run.app
 Backend:  https://aqi-backend-xxx-uc.a.run.app
+==========================================
 ```
 
-### Step 4: Test It!
+### Step 5: Test It!
 
-Open the **Frontend URL** in your browser. Your app is live! 🎉
+Open the **Frontend URL** in your browser. Your app is live on the internet! 🎉
 
 ---
 
@@ -204,63 +238,79 @@ echo "Frontend: $FRONTEND_URL"
 
 ## How It Works
 
-### Understanding the Deployment
+### Understanding the Deployment Pipeline
 
-```
-Your Code
-    ↓
-Docker Build (packages your app)
-    ↓
-Container Registry (stores the package)
-    ↓
-Cloud Run (runs the package)
-    ↓
-Public URL (anyone can access)
-```
-
-### Key Concept: Build-Time vs Runtime
-
-**Backend (Python)** - Runtime variables:
-```python
-# Read when server RUNS
-port = os.environ.get("PORT", 8000)
-api_key = os.environ.get("AQICN_API_TOKEN")  # For AQICN live data
-```
-
-**Frontend (React)** - Build-time variables:
-```javascript
-// Read when code is BUILT, not when it runs!
-const API_URL = import.meta.env.VITE_API_URL
-const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+```mermaid
+flowchart TD
+    subgraph "Your Code"
+        A["Python + React code"]
+    end
+    
+    subgraph "Docker Build"
+        B["Dockerfile reads code"]
+        C["Creates container image"]
+    end
+    
+    subgraph "Container Registry"
+        D["Stores image<br/>gcr.io/project/app"]
+    end
+    
+    subgraph "Cloud Run"
+        E["Pulls image"]
+        F["Runs container"]
+        G["Gets public URL"]
+    end
+    
+    A --> B --> C --> D --> E --> F --> G
 ```
 
-**Important:** The frontend's API URL must be set BEFORE building the Docker image!
+### Build-Time vs Runtime Variables
 
-### Data Flow in Production
+This is **critical** to understand:
 
+```mermaid
+graph TB
+    subgraph "🐍 Backend (Runtime)"
+        B1["Variables read when server RUNS"]
+        B2["AQICN_API_TOKEN"]
+        B3["GOOGLE_SHEET_ID"]
+    end
+    
+    subgraph "⚛️ Frontend (Build-Time)"
+        F1["Variables read when code BUILDS"]
+        F2["VITE_API_URL"]
+        F3["VITE_GOOGLE_MAPS_API_KEY"]
+    end
+    
+    B1 --> B2
+    B1 --> B3
+    F1 --> F2
+    F1 --> F3
 ```
-User selects location on Frontend (via Google Places API)
-    ↓
-Frontend calls Backend /aqi/location endpoint with coordinates
-    ↓
-Backend fetches live data from AQICN API
-    ↓
-Backend returns EPA AQI values with health recommendations
-    ↓
-Result displayed with color-coded AQI and cigarette equivalent
-```
+
+**Why this matters:**
+- Backend can change env vars anytime
+- Frontend env vars must be set **BEFORE** building the Docker image
 
 That's why `deploy.sh`:
 1. Deploys backend first
 2. Gets backend URL
-3. Creates `.env.production` with backend URL and Google Maps API key
+3. Creates `.env.production` with backend URL
 4. THEN builds frontend
 
 ---
 
 ## Making Updates
 
-### Your Workflow
+### Your Update Workflow
+
+```mermaid
+flowchart LR
+    A["1️⃣ Edit code locally"] --> B["2️⃣ Test with start.bat"]
+    B --> C["3️⃣ git commit & push"]
+    C --> D["4️⃣ Run deploy.sh<br/>in Cloud Shell"]
+    D --> E["5️⃣ App updated! 🎉"]
+```
 
 ```bash
 # 1. Make changes locally
@@ -272,69 +322,72 @@ code .
 # 3. Commit and push
 git add .
 git commit -m "feat: Your change"
-git push origin google-cloud-run
+git push
 
 # 4. Deploy (in Cloud Shell)
 cd ~/aqi_app
-git pull origin google-cloud-run
+git pull
 ./deploy.sh
 ```
 
-### What's Safe to Change
+### What's Safe to Change?
 
-| ✅ Safe | ⚠️ Careful | 🚨 Expert Only |
-|---------|------------|----------------|
+| ✅ Safe to Change | ⚠️ Be Careful | 🚨 Expert Only |
+|-------------------|---------------|----------------|
 | Python logic | requirements.txt | Dockerfile |
 | React components | package.json | nginx.conf |
-| CSS styles | Environment vars | cloudbuild.yaml |
-| New API endpoints | | deploy.sh |
+| CSS/Tailwind | API endpoints | cloudbuild.yaml |
+| Static text | Environment vars | deploy.sh |
 
 ---
 
 ## Troubleshooting
 
-### "Permission denied"
-```bash
-chmod +x deploy.sh
+### Common Issues & Solutions
+
+```mermaid
+flowchart TD
+    A["🚨 Deployment failed?"] --> B{"What error?"}
+    
+    B --> |"Permission denied"| C["chmod +x deploy.sh"]
+    B --> |"Project not set"| D["gcloud config set project YOUR_ID"]
+    B --> |"APIs not enabled"| E["Enable required APIs"]
+    B --> |"Container won't start"| F["Check logs"]
+    B --> |"Blank page"| G["Check frontend env vars"]
+    
+    E --> E1["gcloud services enable<br/>cloudbuild.googleapis.com<br/>run.googleapis.com"]
+    F --> F1["gcloud run logs tail aqi-backend"]
+    G --> G1["Rebuild with VITE_API_URL set"]
 ```
 
-### "Project not set"
-```bash
-gcloud config set project YOUR_PROJECT_ID
-```
+### View Logs
 
-### "APIs not enabled"
 ```bash
-gcloud services enable cloudbuild.googleapis.com run.googleapis.com containerregistry.googleapis.com
-```
-
-### Container won't start
-Check logs:
-```bash
+# Live logs (stream)
 gcloud run logs tail aqi-backend --region=us-central1
 gcloud run logs tail aqi-frontend --region=us-central1
+
+# Recent logs
+gcloud run logs read aqi-backend --region=us-central1 --limit=50
 ```
 
-### Frontend shows blank page
-1. Open browser DevTools (F12)
-2. Check Console tab for errors
-3. Check Network tab - is the API URL correct?
+### Frontend Shows Blank Page
 
-**Common cause:** Frontend was built without `VITE_API_URL` set.
+**Most common cause:** Frontend built without `VITE_API_URL`
 
-**Fix:** 
+**Fix:**
 ```bash
-# In Cloud Shell
 cd ~/aqi_app
+
+# Get backend URL
+BACKEND_URL=$(gcloud run services describe aqi-backend --region=us-central1 --format='value(status.url)')
+
+# Create env file
 echo "VITE_API_URL=$BACKEND_URL" > frontend/.env.production
-echo "VITE_GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY" >> frontend/.env.production
+
+# Redeploy
 ./deploy.sh
 ```
-
-### "Failed to fetch" error
-1. Check backend is running: `curl YOUR_BACKEND_URL/health`
-2. Check CORS settings in `backend/main.py`
-3. Make sure frontend has correct backend URL
 
 ---
 
@@ -348,17 +401,28 @@ echo "VITE_GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY" >> frontend/.env.production
 | CPU | 180,000 vCPU-seconds |
 | Memory | 360,000 GiB-seconds |
 
-### For This App
+### What This App Costs
 
-- **Normal usage**: **$0/month**
-- **High usage**: $2-5/month
-- **Scales to zero** when no one uses it
+```mermaid
+pie title Monthly Cost Estimate
+    "Normal usage (< 1k users/day)" : 0
+    "Medium usage (1-10k users/day)" : 2
+    "High usage (10k+ users/day)" : 5
+```
 
-### Check Your Spending
+| Usage Level | Monthly Cost |
+|-------------|--------------|
+| Low (hobby) | **$0** (free tier) |
+| Medium | $2-5 |
+| High | $5-20 |
+
+> 💡 **Scales to zero**: When no one uses your app, you pay nothing!
+
+### Monitor Your Spending
 
 1. Go to **Billing** → **Reports**
 2. Filter by your project
-3. Set up billing alerts if needed
+3. Set up billing alerts if concerned
 
 ### Delete Everything (Stop All Costs)
 
